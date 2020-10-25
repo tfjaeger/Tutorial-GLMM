@@ -3,6 +3,7 @@
 *.log
 *.gz
 *.Rproj
+*.DS_Store
 .Rproj.user
 .Rhistory
 .RData
