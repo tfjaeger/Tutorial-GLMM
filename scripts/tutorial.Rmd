@@ -87,9 +87,9 @@ read up on weibull
   \begin{subfigure}[b]{0.45\textwidth}
   \tikz{ %
     \node[obs] (outcome) {$y_i$} ; %
-    \factor[above=of outcome] {distribution} {left: \textcolor{orange}{$f$}} {} {}; %
+    \factor[above=of outcome] {distribution} {left: \textcolor{orange}{distribution $f$}} {} {}; %
     \node[det, above=of distribution] (mu) {$\mu_i$} ; %
-    \factor[above=of mu] {link} {left: \textcolor{blue}{$g$}} {} {}; %
+    \factor[above=of mu] {link} {left: \textcolor{blue}{inverse link $g^{-1}$}} {} {}; %
     \node[obs, above=of link] (X) {$x_i$} ; %
     \node[latent, right=of X] (beta) {$\beta$} ; %
     % plates
@@ -99,7 +99,7 @@ read up on weibull
     \edge {link} {mu} ; %
     \edge {X, beta} {link} ; %
   }
-  \caption{generalized linear model (GLM)}
+  \caption{Generalized linear model (GLM)}
   \end{subfigure}
   \hfill
   \begin{subfigure}[b]{0.45\textwidth}
@@ -107,25 +107,26 @@ read up on weibull
     \node[obs] (outcome) {$y_{i,j}$} ; %
     \factor[above=of outcome] {distribution} {left: \textcolor{orange}{$f$}} {} {}; %
     \node[det, above=of distribution] (mu) {$\mu_{i,j}$} ; %
-    \factor[above=of mu] {link} {left: \textcolor{blue}{$g$}} {} {}; %
+    \factor[above=of mu] {link} {left: \textcolor{blue}{$g^{-1}$}} {} {}; %
     \node[obs, above=of link] (X) {$x_{i,j}$} ; %
     \node[latent, right=of link] (betas) {$\beta_j$} ; %
     \factor[right=of betas] {group} {below:$\mathcal{N}$} {} {}; %
     \node[latent, above=of group] (Sigma) {$\Sigma$} ; %
     \node[latent, right=of group] (beta) {$\beta$} ; %
-    \node[obs, above=of betas] (grouplevel) {$z_j$} ; %
+    \node[obs, right=of X, above=of betas] (grouplevel) {$z_j$} ; %
     % plates
     \plate[inner sep=0.12cm, xshift=-0.06cm, yshift=0.06cm] {plate1} {(mu) (distribution) (link) (X) (outcome)} {$N $}; %
     \plate[inner sep=0.12cm, xshift=-0.06cm, yshift=0.06cm] {plate2} {(mu) (distribution) (link) (betas) (X) (outcome) (grouplevel) (plate1) } {$M $}; %
     \edge {distribution} {outcome} ; %
     \edge {mu} {distribution} ; %
     \edge {link} {mu} ; %
-    \edge {X, betas} {link} ; %
-    \edge {group, grouplevel} {betas} ; %
+    \edge {X, betas, grouplevel} {link} ; %
+    \edge {group} {betas} ; %
     \edge {Sigma, beta} {group} ; %
   }
-  \caption{generalized linear mixed model (GLMM)}
+  \caption{Generalized linear mixed model (GLMM)}
   \end{subfigure}
+  \caption{The three components of the GLM: the linear predictor ($X\beta$), the link function $g$, and the distribution $f$. For the GLMM, $z_j$ is the $j$th level of the grouping variable $z$, which select which $\beta_j$ is to be chosen for the present case.}
 \end{figure}
 
 
@@ -137,7 +138,7 @@ read up on weibull
     \factor[above=of outcome] {distribution} {left: \textcolor{orange}{$\mathcal{N}$}} {} {}; %
     \node[latent, right=of distribution] (sigma) {$\sigma$} ; %
     \node[det, above=of distribution] (mu) {$\mu_i$} ; %
-    \factor[above=of mu] {link} {left: \textcolor{blue}{$I$}} {} {}; %
+    \factor[above=of mu] {link} {left: \textcolor{blue}{$I^{-1}= I$}} {} {}; %
     \node[obs, above=of link] (X) {$x_i$} ; %
     \node[latent, right=of X] (beta) {$\beta$} ; %
     % plates
@@ -147,15 +148,15 @@ read up on weibull
     \edge {link} {mu} ; %
     \edge {X, beta} {link} ; %
   }
-  \caption{linear model}
+  \caption{Linear model}
   \end{subfigure}
   \hfill
   \begin{subfigure}[b]{0.3\textwidth}
   \tikz{ %
     \node[obs] (outcome) {$y_i$} ; %
     \factor[above=of outcome] {distribution} {left: \textcolor{orange}{$Poisson$}} {} {}; %
-    \node[det, above=of distribution] (mu) {$\mu_i$} ; %
-    \factor[above=of mu] {link} {left: \textcolor{blue}{$log$}} {} {}; %
+    \node[det, above=of distribution] (mu) {$\lambda_i$} ; %
+    \factor[above=of mu] {link} {left: \textcolor{blue}{$log^{-1} = exp$}} {} {}; %
     \node[obs, above=of link] (X) {$x_i$} ; %
     \node[latent, right=of X] (beta) {$\beta$} ; %
     % plates
@@ -172,8 +173,8 @@ read up on weibull
   \tikz{ %
     \node[obs] (outcome) {$y_i$} ; %
     \factor[above=of outcome] {distribution} {left: \textcolor{orange}{$Bernoulli$}} {} {}; %
-    \node[det, above=of distribution] (mu) {$\mu_i$} ; %
-    \factor[above=of mu] {link} {left: \textcolor{blue}{$logit$}} {} {}; %
+    \node[det, above=of distribution] (mu) {$p_i$} ; %
+    \factor[above=of mu] {link} {left: \textcolor{blue}{$logit^{-1}$}} {} {}; %
     \node[obs, above=of link] (X) {$x_i$} ; %
     \node[latent, right=of X] (beta) {$\beta$} ; %
     % plates
@@ -183,10 +184,13 @@ read up on weibull
     \edge {link} {mu} ; %
     \edge {X, beta} {link} ; %
   }
-  \caption{logistic regression}
+  \caption{Logistic regression}
   \end{subfigure}
-  \caption{Three different GLMs with their canonical link functions}
+  \caption{Three different GLMs with their canonical link functions, and using typical notation (e.g., $\lambda$ instead of $\mu$ for the expected value of the Poisson model).}
 \end{figure}
+
+
+
 
 
 # Reading and assignments in *preparation* of this class
@@ -196,6 +200,57 @@ Please make sure you have read *all* of Gelman \& Hill (2007, p. 301-310 in Ch 1
 Then read and *work through* this document. We will use class to go through the important concepts and to address any questions that you have about the readings or the problem sets in this document. **Please note that this document is providing R code only.** Some of the steps described here might have less direct solutions in Matlab, so it is recommended that you start early. I have, however, tried to describe each step in a way that does not depend on R or Matlab.
 
 In this document, you will find sections labeled "Prepare for class". Please work through those examples and write up your answers. If there are a few questions, you cannot answer, elicit help on the slack channel. In addition, there are sections called "Discussion questions for class". Please think about these questions, but don't worry if you get stuck. These are some questions we can go through during class.
+
+
+
+
+# Weibull regression
+
+\begin{figure}
+  \centering
+  \begin{subfigure}[b]{0.45\textwidth}
+  \tikz{ %
+    \node[obs] (outcome) {$y_i$} ; %
+    \factor[above=of outcome] {distribution} {left: \textcolor{orange}{$Weibull$}} {} {}; %
+    \node[det, right=of distribution] (shape) {shape $k$} ; %
+    \node[det, above=of distribution] (mu) {$\lambda_i$} ; %
+    \factor[above=of mu] {link} {left: \textcolor{blue}{$log^{-1} = exp$}} {} {}; %
+    \node[obs, above=of link] (X) {$x_i$} ; %
+    \node[latent, right=of X] (beta) {$\beta$} ; %
+    % plates
+    \plate[inner sep=0.12cm, xshift=-0.06cm, yshift=0.06cm] {plate1} {(mu) (distribution) (link) (X) (outcome) } {$\forall i=1 \ldots N $}; %
+    \edge {distribution} {outcome} ; %
+    \edge {mu, shape} {distribution} ; %
+    \edge {link} {mu} ; %
+    \edge {X, beta} {link} ; %
+  }
+  \caption{only scale parameter ($\lambda$) is inferred}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.45\textwidth}
+  \tikz{ %
+    \node[obs] (outcome) {$y_i$} ; %
+    \factor[above=of outcome] {distribution} {left: \textcolor{orange}{$Weibull$}} {} {}; %
+    \node[latent, right=of distribution] (shape) {shape $k$} ; %
+    \node[det, above=of distribution] (mu) {$\lambda_i$} ; %
+    \factor[above=of mu] {link} {left: \textcolor{blue}{$log^{-1} = exp$}} {} {}; %
+    \node[obs, above=of link] (X) {$x_i$} ; %
+    \node[latent, right=of X] (beta) {$\beta$} ; %
+    % plates
+    \plate[inner sep=0.12cm, xshift=-0.06cm, yshift=0.06cm] {plate1} {(mu) (distribution) (link) (X) (outcome) } {$\forall i=1 \ldots N $}; %
+    \edge {distribution} {outcome} ; %
+    \edge {mu, shape} {distribution} ; %
+    \edge {link} {mu} ; %
+    \edge {X, beta} {link} ; %
+  }
+  \caption{both shape ($k$ and scale parameters ($\lambda$) are inferred}
+  \end{subfigure}
+  \caption{The Weibull regression is *not* a GLM, unless the shape parameter $k$ is fixed.}
+\end{figure}
+
+
+
+
 
 
 

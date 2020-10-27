@@ -3,7 +3,7 @@ library(magrittr)
 library(R.matlab)
 
 # First let's get the MatLab structure
-s = readMat("data/data_ClarkCrowding.mat")
+s = readMat("data/dataCrowdingEcc_Clark.mat")
 
 d.fixation = matrix(s$dataCrowding[[1]], nrow=dim(s$dataCrowding[[1]])[3], byrow = T) %>% 
   as.data.frame() %>%

@@ -1,6 +1,7 @@
 *.Rproj
 *.rds
 *.log
+*.aux
 *.gz
 *.Rproj
 *.DS_Store
