@@ -30,7 +30,7 @@ d %<>%
   select(Subject, Condition, everything()) %>%
   unnest()
 
-write_csv(d, path = "data/data_ClarkCrowding.csv")
+write_csv(d, path = "data/data_ClarkCrowding_TrialLevel.csv")
 
 
 

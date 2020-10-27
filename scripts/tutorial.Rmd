@@ -204,52 +204,6 @@ In this document, you will find sections labeled "Prepare for class". Please wor
 
 
 
-# Weibull regression
-
-\begin{figure}
-  \centering
-  \begin{subfigure}[b]{0.45\textwidth}
-  \tikz{ %
-    \node[obs] (outcome) {$y_i$} ; %
-    \factor[above=of outcome] {distribution} {left: \textcolor{orange}{$Weibull$}} {} {}; %
-    \node[det, right=of distribution] (shape) {shape $k$} ; %
-    \node[det, above=of distribution] (mu) {$\lambda_i$} ; %
-    \factor[above=of mu] {link} {left: \textcolor{blue}{$log^{-1} = exp$}} {} {}; %
-    \node[obs, above=of link] (X) {$x_i$} ; %
-    \node[latent, right=of X] (beta) {$\beta$} ; %
-    % plates
-    \plate[inner sep=0.12cm, xshift=-0.06cm, yshift=0.06cm] {plate1} {(mu) (distribution) (link) (X) (outcome) } {$\forall i=1 \ldots N $}; %
-    \edge {distribution} {outcome} ; %
-    \edge {mu, shape} {distribution} ; %
-    \edge {link} {mu} ; %
-    \edge {X, beta} {link} ; %
-  }
-  \caption{only scale parameter ($\lambda$) is inferred}
-  \end{subfigure}
-  \hfill
-  \begin{subfigure}[b]{0.45\textwidth}
-  \tikz{ %
-    \node[obs] (outcome) {$y_i$} ; %
-    \factor[above=of outcome] {distribution} {left: \textcolor{orange}{$Weibull$}} {} {}; %
-    \node[latent, right=of distribution] (shape) {shape $k$} ; %
-    \node[det, above=of distribution] (mu) {$\lambda_i$} ; %
-    \factor[above=of mu] {link} {left: \textcolor{blue}{$log^{-1} = exp$}} {} {}; %
-    \node[obs, above=of link] (X) {$x_i$} ; %
-    \node[latent, right=of X] (beta) {$\beta$} ; %
-    % plates
-    \plate[inner sep=0.12cm, xshift=-0.06cm, yshift=0.06cm] {plate1} {(mu) (distribution) (link) (X) (outcome) } {$\forall i=1 \ldots N $}; %
-    \edge {distribution} {outcome} ; %
-    \edge {mu, shape} {distribution} ; %
-    \edge {link} {mu} ; %
-    \edge {X, beta} {link} ; %
-  }
-  \caption{both shape ($k$ and scale parameters ($\lambda$) are inferred}
-  \end{subfigure}
-  \caption{The Weibull regression is *not* a GLM, unless the shape parameter $k$ is fixed.}
-\end{figure}
-
-
-
 
 
 
@@ -313,19 +267,20 @@ The goals of this research are to (1) investigate the effect of crowding within 
 
 ## Methods
 Studying FEMs during visual crowding within the foveola requires high-precision eye tracking and accuracy in localizing the center of gaze. Current video eye trackers do not have the required spatial precision, as the error of gaze localization is as large as the foveola itself. However, by using a custom built state-of-the-art eye tracking system with arcminute precision, we will be able to examine exactly how FEMs contribute to crowding within the foveola. Stimuli consist of a number-font designed specifically for studying crowding in the fovea, as it allows for recognition even when numbers are closer together than traditional optotypes used in other crowding studies.6 Two conditions will be examined, the uncrowded (where a single number is presented), and the crowded (where the same size number is presented, but with four surrounding numbers). The size of the number and spacing between the numbers in the crowded condition change throughout the experiment based on the subject’s performance using an adaptive procedure. The stimuli presented will vary in size, ranging from 0.5 arcminutes to 4 arcminutes in width. To determine the number-width threshold, we use a standard psychophysics procedure measuring the width of the stimulus at which a subject performs above chance level. New variables at a trial level include the followding
-* Size: the width (or strokwidth) of the stimulus during that group of trials.
-* Performance: What the overall performance for the size stimulus was.
-* Response: What number the subject guessed.
-* Answer: What the number presented on the screen was.
-* Correct: Wether the response was correct or not (combining information from Response and Answer)
-* Response Time: response time of subject. Note* subjects were not told to response as quickly as possible during experiment.
-* Traces: the x and y traces of each trial in this size stimulus group.
-* Trial Curvature: Same as curvature above, but for each individual trial.
-* Trial Speed: Same as speed above, but for each individual trial. 
+
+ * Size: the width (or strokwidth) of the stimulus during that group of trials.
+ * Performance: What the overall performance for the size stimulus was.
+ * Response: What number the subject guessed.
+ * Answer: What the number presented on the screen was.
+ * Correct: Wether the response was correct or not (combining information from Response and Answer)
+ * Response Time: response time of subject. Note* subjects were not told to response as quickly as possible during experiment.
+ * Traces: the x and y traces of each trial in this size stimulus group.
+ * Trial Curvature: Same as curvature above, but for each individual trial.
+ * Trial Speed: Same as speed above, but for each individual trial. 
 
 ## Overview
 ```{r load data, message=F}
-d = read_csv("../data/data_ClarkCrowding.csv") %>%
+d = read_csv("../data/data_ClarkCrowding_TrialLevel.csv") %>%
   mutate_at(c("Subject", "Condition"), factor)
 d %<>%
   filter(Condition != "Fixation") %>%
@@ -336,367 +291,8 @@ d
 
 
 
-# Coding categorical (and other) predictors
 
-If we want to include categorical predictors (e.g., "Condition A" vs. "Condition B") in an LM, we thus need to translate these predictors into numerical variables. This process is sometimes called predictor *coding*. Some people use this term narrowly to only refer to the coding of categorical predictors (or, as they are sometimes called, *factors*; hence the name factor coding). Others use it to refer to any changes or transformation we make to our predictors, including continuous predictors (e.g. centering or scaling). In this tutorial, we talk about both.
 
-If you have been using analysis of variance (ANOVA), coding is a process that you might already be familiar with: in ANOVA-based result reporting, we regularly follow the initial ANOVA significance tests with so called "planned" or "post-hoc" comparisons. These comparisons assess hypotheses about the means of the different experimental conditions. 
-
-You might have heard terms like (forward/backward) Helmert coding, (forward/backward) sliding difference coding, polynomial coding, sum/deviation/ANOVA coding, or treatment/dummy coding, etc. These are all names for different ways to code categorical factors, and they do exactly the same job in an LM as they do for the planned or unplanned post-hoc analyses after an ANOVA. In fact, the post-hoc tests reported for ANOVA-based approaches are typically run as an LM, but that's another topic. (Note that these post-hoc tests are the only way to obtain information about the *direction* of an effect in the ANOVA approach, since the ANOVA itself only assesses the significance of a predictor). 
-
-In an LM, we need to make these coding decision *prior* to fitting the model. **Most statistics programs have default coding choices built-in that they apply to any LM or other regression you fit. Be aware of these defaults, as they will affect what the output of an LM means if you forgot to explicitly define the factor coding for the LM.** In R, for example, all factors for which we have not explicitly defined coding will be treatment coded, with the reference level set to the first level of the factor (we'll get to what all of this means). And, if you haven't defined how the levels of the factor order, R will assume that they order alphanumerically. 
-
-Such defaults can be handy in that they mean you can just run a model like: 
-
-$$ Threshold \sim 1 + Condition $$
-
-where Threshold is the outcome, $\sim$ refers to "regress against", 1 refers to the intercept (which by default would be included anyway, but I'm being explicit here), and Condition is a factor with two levels "crowded" and "uncrowded". But defaults can also wreak havoc. In this example, R would automatically code "crowded" as the reference level (0), because it comes alphanumerically first, and "non-crowded" as the treatment (1). The coefficient for Condition would thus---perhaps counter-intuitively---reflect the increase in the threshold in the *un*crowded condition relative to the crowded condition. In short:
-
- + **don't rely on default**; 
- + **code your factors explicitly**;
- + **use variable names and level names that are transparent and avoid confusion**
-
-
-# Coding a binary categorical predictor
- 
-Let's start with the simplest case: coding a binary (two-level) factor. This will allow us to build intuitions both about *how* we can code variables, and *what the consequences of those codes are*. We'll stick with the example from above. 
-
-Factor coding essentially translates the categorical predictor into a numerical predictor. This is achieved through so called *contrasts*. Specifically, for a factor with $k$ distinct levels we can use $k-1$ contrasts to create $k-1$ numerical predictors. These numerical predictors capture all the information of the $k$ levels of the original factor. Each contrast is a vector with $k$ numeric elements, describing the mapping from factor levels to numerical values.
-
-For a binary factor, we thus have one contrast that is a vector with two values. This contrast defines one numerical predictor. E.g., by default in R, we'd get the following for Ashley's data set on visual crowding:
-
-```{r}
-contrasts(d$Condition)
-```
-
-And, each time a regression function is called, this allows R to *implicitly* create a new column in our data that is the numerical translation of the Condition variable. Thus a model like
-
-$$ Threshold \sim 1 + Condition $$
-
-is actually running the model
-
-$$ Threshold \sim 1 + ConditionUncrowded $$
-
-where $ConditionUncrowded$ is a numerical variable that has been silently added to our data:
-
-```{r}
-d %>%
-  mutate(ConditionUncrowded = ifelse(Condition == "Uncrowded", 1, 0))
-```
-
-Remember the *model matrix* $X$ from above? In R (and probably Matlab), specifying an LM formula implicitly creates a model matrix $X$ from the data, and the function lm is using that model matrix (and the column of outcomes, $\mathbf{y}$) to fit the linear model. Looking at the model matrix can be a powerful tool in understanding factor coding. For example, prior to specifying any factor coding, the model matrix for the above model would be:
-
-```{r, echo=T}
-model.matrix( ~ 1 + Condition, data = d)
-```
-
-Notice the implicitly created column of 1s for the intercept 'predictor' (i.e., $x_0$ is the constant 1). We also see that the first 10 rows of the data are coded as 1 for Condition and the second 10 rows as 0. That's because the first 10 rows are from the uncrowded condition (see above). Below, I'll show the model matrix for each of the coding examples. This should also help you translate the examples into another statistic program: if push comes to shove, you can always manually create the variables shown in the model matrix and then hand that manually created data to the model-fitting function of your program.
-
-## Treatment/dummy-coding
-
-The default in many statistics programs is treatment-coding, like in the example we just went through. Under this coding scheme, we contrast all other condition against a baseline (or "reference") condition. Since the default is in this case somewhat counter-intuitive---it's more intuitive to think of visual *crowding* as the treatment---we set define our own treatment coding:
-
-```{r}
-contrasts(d$Condition) = cbind("Crowded" = c(1,0))
-contrasts(d$Condition)
-```
-
-With this change in contrast, the model matrix also changes. Now the first 10 rows of the data are coded as 0 for the condition predictor, and the second rows are coded as 1.
-
-```{r, echo=T}
-model.matrix( ~ 1 + Condition, data = d)
-```
-
-Now we can fit the LM and summarize that *fit*:
-
-```{r}
-l.treatment = lm(Threshold ~ 1 + Condition, data = d)
-summary(l.treatment)
-```
-
-In this treatment-coded model:
-
- + the intercept estimate give us the model's prediction for the mean outcome *of the reference level* of Condition (because the intercept *always* gives us the model's prediction when all other terms of the model are 0---e.g., when all other predictors are 0). In this case, this is the mean threshold for the uncrowded condition.
- + the ConditionCrowded estimate tells us how much larger (or smaller) the threshold is for the treatment condition. In this case, this is the crowded condition. 
- + the sum of the intercept and the estimate for the coefficient for ConditionCrowded give us the model's prediction for the mean outcome of the treatment level.
- 
-We can convince ourselves that the above interpretation is correct by looking at the predictions of the model for each observation, and comparing them to the estimates for the intercept and the coefficient for ConditionCrowded. First, let's have a look at the model's predictions, and attach. It's just a vector with as many elements as there are outcomes in the data we fit with the linear regression.
-
-```{r}
-# Just to make sure this shows up across two lines of output =)
-fitted(l.treatment)[1:10]
-fitted(l.treatment)[11:20]
-```
-
-Note that the model only predicts two different values---one for the crowded condition and one for the uncrowded condition. This becomes apparent when we attach the fitted/predicted values to the data.frame. Here I'm only showing the Subject, Condition, Threshold, and fitted values:
-
-```{r}
-d %<>%
-  mutate(fitted = fitted(l.treatment))
-d %>% 
-  select(Subject, Condition, Threshold, fitted)
-```
-
-For the uncrowded condition, the fitted value is 1.525 ... the exact same as the intercept estimate. For the crowded condition, the fitted value is 2.101, which is 1.525 (the intercept estimate) + .576 (the estimate for the coefficient of ConditionCrowded). In other words, for all conditions and for all data points, the predicted/fitted value of the LM $\widehat{y_i} = intercept + slope * Condition_i = \beta_0 + \beta_{condition} x_{condition}$, where $x_{condition}$ is 1 for the crowded condition and 0 for the uncrowded condition. Noice!
-
-The following figure shows the data we entered into the LM, and the predictions of the LM.
-
-```{r, echo=F, fig.cap="Size (in arcminutes) at which threshold performance (62.5\\% correct) was reached by crowding condition. Each color shows a separate subject. Black triangles show the predicted outcome of a linear model fit to the data.", fig.width=4, fig.height=4}
-d %>%
-  ggplot(aes(x = Condition)) +
-  geom_point(aes(y = Threshold, color = Subject), alpha = .5) +
-  geom_line(aes(y = Threshold, color = Subject, group = Subject), alpha = .3) +
-  stat_summary(aes(y = fitted),
-               fun = mean, geom = "point", size = 2, shape = 2) +
-  theme_bw() + theme(panel.grid.major.x = element_blank(), panel.grid.minor.x = element_blank())
-```
-
-
-### Prepare for class
-
- 1. Why does the model predict only two different values for the outcome variable?
- 1. How would you calculate the epsilon/residual for each observation from this data? (Try it)
- 1. How could you calculate the residual sum of squares for this model from this data? (Try it)
- 1. We obtain the straightforward interpretation of the ConditionCrowded estimate only because we coded the treatment condition as 1, rather than, e.g., as 2. What would happen if we coded the treatment condition as 2 (and the reference condition still as 0)? Would our estimate for the coefficient for ConditionCrowded change? What about the estimate of the intercept? Why? (Much of this can be answered by trying to change the coding)
- 1. Would the predicted/fitted values of the model change if we change the coding to 2 vs. 0? Why?
-
-### Questions for discussion in class
-
- 6. How could you calculate the $R^2$ value shown as part of the model output from just the predicted/fitted values and the original data? (cf. James et al., 2013, p. 70-71)
- 
-
-
-## Effect/deviation/sum/anova-coding
-
-While treatment-coding is the default in the regression world, it is actually rarely used in experimental psychology, brain imaging, or related fields that use factorial/balanced designs. Rather, we typically code our data in a different way, because it changes the interpretation of the intercept in ways that researchers that are used to ANOVA tend to find more intuitive. This alternative is called effect/deviation/sum/anova-coding:
-
-```{r}
-contrasts(d$Condition) = cbind("Crowded.vs.Uncrowded" = c(.5,-.5))
-contrasts(d$Condition)
-```
-
-With this change in contrast, the model matrix also changes:
-
-```{r, echo=T}
-model.matrix( ~ 1 + Condition, data = d)
-```
-
-Let's refit the model with this newly coded factor:
-
-```{r}
-l.deviation = lm(Threshold ~ 1 + Condition, data = d)
-summary(l.deviation)
-```
-
-In this deviation-coded model:
-
- + the intercept estimate is now the predicted *overall mean* of the outcome.
- + the estimate for the coefficient of Condition is the predicted difference between the two conditions. 
- + the two conditions means are described as the sum of the intercept estimate +/- .5-times the estimate for the coefficient of Condition.
-
-Why do researchers used to ANOVA find this more intuitive? You'll sometimes here that it's nice that the intercept now corresponds to the mean, but the true convenience of this coding scheme will become apparent once we consider interactions below. It is under deviation-coding, that we can talk about *main effects* and *interactions* in the same sense as in an ANOVA. That's presumably also why some people call this coding scheme anova-coding. We'll get to that. But first some questions.
-
-### Prepare for class
-
- 1. What happens if we double the values we assign to each of the two deviation-coded conditions, i.e., if we use 1 vs. -1 instead of .5 vs. -.5? What if we set them to -1000 vs. 1000? What changes and what doesn't? Why? (Try it)
-
-```{r, echo = T}
-contrasts(d$Condition) = cbind("Crowded vs. Uncrowded" = c(1,-1))
-```
-
- 2. Are the predicted/fitted values of any of these deviation-coded models different from each other? (Try it)
- 3. Are the predicted/fitted values of any of these deviation-coded models different from the treatment-coded model presented in the previous section? Why?
- 
-### Discussion questions for class
-
- 4. We obtain the intuitive interpretation of the intercept (as the predicted grand mean of the data) only because the data is ... what? (recall that the intercept is *always* the predicted value for the case when all other terms add up to zero). Conveniently, most data sets obtained from psychological experiments have the same property we are looking for here---either exactly or at least approximately (after exclusions).
-
-## Writing up results
-
-How would we write up, for example, the deviation-coded model. There are, of course, about as many difference preferences as they are researchers, and so you will find conflicting advice. But generally, it will be helpful if you are clear about all of the following:
-
- + What model you used
- + What predictors you considered (incl. those that you did not include in the final model, cf. debate about *researchers' degrees of freedom*)
- + How you coded the outcome (e.g., what unit is the outcome in; without this information, readers cannot determine the size of effects or interpret them on the original scale)
- + How you coded predictors (without this information, readers cannot even determine in which *direction* the effect is!)
- + What steps (if any) were taken to ascertain the validity of the model (see, e.g., model evaluation in Gelman \& Hill, 2007, Section 3.7). This is arguably less important if you study a well-known phenomenon that has been analyzed with this method many times, and for which you have data that is a) balanced with regard to the predictors in the model, and b) has many observations relative to the number of predictors in the model.
-
-When reporting results, I recommend you provide both the relevant statistics (coefficient estimates, $p$-values, etc.), and a descriptive interpretation of that result in non-technical language---but we careful to avoid language that is wrong (see, e.g., section on interactions for some examples). Finally, for any non-trivial model, I highly recommend the use of a summary table of the model and visualization of the *empirical* distribution of the data (potentially, while *also* showing the model's predictions). The latter helps readers not familiar with the analysis approach to understand your results.
-
-Here is a rather detailed write-up for the model with the deviation-coded condition variable. In many scenarios (e.g., if the units of the outcome variable are not necessarily informative), you might decide to provide less detail:
-
-\color{lightgray}
-We analyzed the data with a linear regression, using the function \texttt{lm} from the \texttt{base} package (citation with version) of the software \texttt{R} (citation with version). We calculated each subject's mean thresholds for the crowded and uncrowded condition. These 20 threshold values were regressed against condition (deviation-coded: .5 = *crowded* vs. -.5 = *uncrowded*). We found a statistically significant main effect of condition ($\widehat{\beta}=.576, t=3.657, p<.01$), so that subjects reached threshold performance at a size that was about half an arcminute larger in the crowded condition (mean = `r  reduce(tidy(l.deviation)[["estimate"]], .f = function(x, y) round(x + .5 * y, 3))`), compared to the uncrowded condition (mean = `r  reduce(tidy(l.deviation)[["estimate"]], .f = function(x, y) round(x - .5 * y, 3))`).
-\color{black}
-
-
-
-
-
-
-
-
-
-# Combining factors and continuous predictors
-
-Now that we know how to code factors (or at least binary factor), we can combine continuous and categorical predictors in our model. We first show a simple 'additive' model, in which we assume that the effects of the categorical and continuous predictors are additive. Then we consider a model that also contains an interaction, allowing the two effects to be more or less than additive. **The models presented here merely serve the purpose of illustrating how we can fit, analyze, and interpret models with continuous and categorical predictors. The one degree of freedom we have in our model so far (Condition) already puts as at the maximum of the recommended degrees of freedom for 20 data points.** Including additional parameters, as we do below, increases the risk of overfitting the model to the data.
-
-
-## Do both the diffusion constant and the crowdedness condition affect threshold performance?
-
-For example, let's test the effects of both Condition and DiffusionConstant. For simplicity's sake, we continue to use deviation coding for Condition:
-
-$$ Threshold \sim 1 + Condition + DiffusionConstant $$
-What happens when we include both of these predictors in the LM?
-
-```{r}
-contrasts(d$Condition) = cbind("Crowded vs. Uncrowded" = c(.5,-.5))
-l.combined = lm(Threshold ~ 1 + Condition + DiffusionConstant, data = d)
-summary(l.combined)
-```
-
-Right away, we can see that the diffusion constant seems to account for a *lot* of additional variability in the model: the $R^2$ of the model is almost twice as large as the one we obtained when only considering condition. The output of the regression also tell us that both of the predictors have statistically significant effects on subjects' threshold performance. We can visualize the data and the model's predictions together:
-
-```{r, echo=F, fig.cap="Size (in arcminutes) at which threshold performance (62.5\\% correct) was reached by diffusion constant and crowding condition. Each color shows a separate subject. Black lines show the predicted outcome of a linear model fit to the data.", fig.width=4.5, fig.height=4}
-d %>%
-  ggplot(aes(x = DiffusionConstant)) +
-  geom_point(aes(y = Threshold, color = Subject, shape = Condition), alpha = .5) +
-  geom_abline(
-    intercept = coef(l.combined)[1] + .5 * coef(l.combined)[2],
-    slope = coef(l.combined)[3], 
-    linetype = 1, color = "black") +
-  geom_abline(
-    intercept = coef(l.combined)[1] - .5 * coef(l.combined)[2],
-    slope = coef(l.combined)[3], 
-    linetype = 2, color = "black") +
-  theme_bw()
-```
-
-### Write-up
-
-Here's a somewhat less detailed write-up for our two-predictor model, building on the example provided above:
-
-\color{lightgray}
-We analyzed the data with a linear regression, using the function \texttt{lm} from the \texttt{base} package (citation with version) of the software \texttt{R} (citation with version). We calculated each subject's mean thresholds for the crowded and uncrowded condition. These 20 threshold values were regressed against condition (deviation-coded: .5 = *crowded* vs. -.5 = *uncrowded*) **and the diffusion constant**. We found a statistically significant effect of condition ($\widehat{\beta}=.431, t=4.738, p<.01$), so that subjects reach threshold performance at larger sizes in the crowded condition, compared to the uncrowded condition. **We also found a statistically significant effect of the diffusion constant ($\widehat{\beta}=.035, t=6.373, p<.01$), so that larger diffusion constants required larger sizes to achieve threshold performance.**
-\color{black}
-
-### Prepare for class
-
- 1. Notice how that the intercept estimate in this model is not the same as in the model that only contains Condition as a predictor. That also means that the intercept no longer represents the prediction for the grand mean of the outcome. Was that inevitable? Can you think of a scenario in which the inclusion of the additional predictor (DiffusionConstant) would *not* change the intercept estimate? (Recall that the intercept always is the model's prediction when all other terms of the model add to 0.) If you get stuck on this question, it will get resolved in the next section, but think about it before you read on.
- 1. The coefficient estimate for Condition has changed. Specifically, it is now somewhat smaller (.431 vs. .576). What do you make out this? Does it tell you something about the relation between the two *predictors* (Condition and DiffusionConstant)?
- 1. What is an intuitive geometric interpretation of this model? The effect of a single continuous predictor (DiffusionConstant) is described by the intercept and slope. So what does the present model result in? (If you get stuck in thinking about this, re-read Gelman \& Hill, 2007, p. 31-33).
- 
-### Discussion questions for class
-
- 4. Can we conclude from this model, and the fact that the two predictors are both significant, that the two effects are additive? Why or why not?
- 1. Can we conclude that DiffusionConstant has an effect in both crowdedness conditions? Why or why not?
- 1. Can we conclude that DiffusionConstant had an independent effect beyond condition? Why or why not?
-
-
-
-
-# Intermezzo: centering continuous predictors
-
-Recall that the intercept estimate changed once we added the DiffusionConstant as a predictor to the LM. As we've already covered, the intercept always gives us the prediction when all other terms in the model add up to 0 (because, if $\beta_1 x_1 + ... + beta_k  x_k = 0$ then the LM predicts that $E(y) = \beta_0$). Partly for this reason, it is often recommended that all predictors in the model are *centered*. Since the mean of a centered predictor $x_i$ is 0 (i.e., $E(x_i) = 0$), the average of the term $\beta_i x_i$ is also 0. So if *all* predictors in a model are centered, then $\forall i: \beta_i x_i = 0 \Rightarrow \Sigma_{i=1}^k \beta_i x_i = 0 \Rightarrow E(y) = \beta_0$.
-
-For data that is balanced with regard to a factor (e.g., Condition), deviation-coding results in a centered predictor. For example, for the deviation-coded model introduced above, we coded the crowded condition as .5 and the uncrowded condition as -.5. If both conditions appear equally often in the data (as they do), then the average of the implicitly created numerical predictor that results from this coding is 0. 
-
-But what about the continuous predictor in our model. DiffusionConstant does not have a mean of zero:
-
-```{r, echo=T}
-round(mean(d$DiffusionConstant), 5)
-```
-
-In the combined model from the previous section, the intercept estimate thus corresponds to the threshold value that is expected when the diffusion constant is 0, which it never is because all values of the diffusion constant are positive:
-
-```{r, echo=T}
-range(d$DiffusionConstant)
-```
-
-Once we center diffusion constant by subtracting its mean from each of its values, the new mean of the centered diffusion constant (DiffusionConstant_c) is 0:
-
-```{r, echo=T}
-d %<>%
-  mutate(across(where(is.numeric), list("c" = function(x) x - mean(x))))
-round(mean(d$DiffusionConstant_c), 5)
-```
-
-When we re-fit the combined LM from the previous section with the new centered diffusion constant, the **intercept estimate now again predicts the overall mean threshold**:
-
-```{r}
-summary(lm(Threshold ~ 1 + Condition + DiffusionConstant_c, data = d))
-```
-
-This---that the intercept estimates is the predicted grand mean of the outcome---will always be the case, no matter how many predictors we have in the model. 
-
-**Note further that centering does *not* affect the slope estimates for the other effects in the model.** Neither does it affect the standard error estimates of those slopes (or $t$ statistics or $p$-value). Removing the mean from a predictor is a linear transformation does not affect the best-fitting slope of that predictor in predicting the outcome of an LM. Neither does centering affect the predicted/fitted values of the LM (you can compare the 20 predicted/fitted values for the combined model before and after centering DiffusionConstant). The same holds, of course, for the residuals, the $R^2$, the adusted $R^2$ and similar measures.
-
-This will *not* always be the case. In the next section, for example, we will see that centering can change the standard error (and thus $t$ statistic and $p$-value) for an interaction. More generally, centering can affect the the standard error when the removal of the mean from each variable changes the correlations between predictors (we we will return to the issue of correlations between predictors in future meetings). 
-
-
-
-
-
-
-# Interactions between factors and continuous predictors
-
-Next, we expand the analysis further. We remove the additivity assumption. Or rather, the addidivity assumption still holds but we expand the model in a way that we are not assuming the our two predictors are additive. This is done by including an interaction between the two predictors. Here I show this for the case of one continuous predictor (DiffusionConstant) and one binary categorical predictor (Condition), but the same logic extends to interactions between multiple continuous or multiple categorical predictors, as well as interactions between interactions (e.g., three-way interactions, etc.). Like for the remainder of this tutorial, we focus on the type of planned analysis typical for (or at least the idea of) experimental psychology. For that reason, we do not discuss considerations about when we should even consider an interaction (but see, for example, Harrell, 2001 for insightful discussion, as well as Gelman \& Hill, 2007, p. 36).^[The short of those considerations is that introducing additional complexity (degrees of freedom) increases the risk of overfitting to the data, and with it the risk of spurious/unreliable conclusions. It is thus advisable to include additional complexity in the model only if is is motivated theoretically, by previous work, or other a priori considerations. Another specific recommendation you'll see often is to only include interactions if all their components are also included in the model, unless there is a good theoretical reason to do otherwise. These recommendations are not specific to the LM.]
-
-For the case of one continuous and one categorical predictor, the geometric interpretation of the model is that we now allow the two lines (corresponding to the continuous predictor's effect at the two levels of the categorical predictor) to not be parallel. And our question of whether the interaction is *significant* becomes the question whether the difference in the slope of the two lines is statistically different from zero.
-
-We can ask this question by adding a new predictor to the model that is the *product* of the two predictors (cf. Gelman \& Hill, 2007, p. 34-36; James et al., 2013, p. 87-90). We then ask whether this new predictor has a non-zero effect, i.e., we ask whether the coefficient for this new predictor is different from zero. In R, the regression formula for this model is written as (where the colon is the interaction operator):
-
-$$ Threshold \sim 1 + Condition + DiffusionConstant + Condition:DiffusionConstant$$
-
-which essentially runs the following model (where I is the identity operator, which return x for x):
-
-$$ Threshold \sim 1 + Condition + DiffusionConstant + I(Condition * DiffusionConstant)$$
-
-or shorter (where X1 * X2 is a shorthand for the full-factorial combination of X1 and X2):
-
-$$ Threshold \sim 1 + Condition*DiffusionConstant$$
-
-Just like, e.g., factor coding implicit creates an additional numerical variable that encodes the factor's information, the interaction operator implicitly creates a new variable in our data that is the product if the (numerically coded) factor Condition and the continuous predictor DiffusionConstant. To see this, we again look at the model matrix:
-
-With this change in contrast, the model matrix also changes:
-
-```{r, echo=T}
-model.matrix( ~ 1 + Condition * DiffusionConstant, data = d)
-```
-
-
-
-## Do the effects of condition and difficusion constant interact?
-
-Now we can fit the new LM with the interaction, and look at the summary of results. We will use the centered DiffusionConstant for this model---i.e., we'll fit the model $ Threshold \sim 1 + Condition*DiffusionConstant_c$. For this model, we can refer to the effect of condition as the "*main* effect" of condition (roughyl speaking, the overall, or mean, effect of condition). If we didn't center the diffusion constant---and more generally, if there were other uncentered variables in the model---the effect of of condition would not be conventionally referred to as main effect.
-
-```{r}
-l.interaction = lm(Threshold ~ 1 + Condition * DiffusionConstant_c, data = d)
-summary(l.interaction)
-```
-
-The first thing we can notice is that the $R^2$ of the model has barely increased. In other words, adding the interaction doesn't explain much more variance in the outcome. Indeed, the adjusted $R^2$ (which is the $R^2$ corrected for the complexity of the model) has *de*creased. With this in mind, it is not surprising that the interaction does not have a significant effect. In short, we cannot reject the null hypothesis that the effect of the diffusion constant on the threshold is identical for crowded and uncrowded condition. This is also in line with a visualization of the data and the model:
-
-```{r, echo=F, fig.cap="Size (in arcminutes) at which threshold performance (62.5\\% correct) was reached by diffusion constant (centered) and crowding condition. Each color shows a separate subject. Black lines show the predicted outcome of a linear model fit to the data.", fig.width=4.5, fig.height=4}
-d %>%
-  ggplot(aes(x = DiffusionConstant_c)) +
-  geom_point(aes(y = Threshold, color = Subject, shape = Condition), alpha = .5) +
-  geom_abline(
-    intercept = coef(l.interaction)[1] + .5 * coef(l.interaction)[2],
-    slope = coef(l.interaction)[3] + .5 * coef(l.interaction)[4], 
-    linetype = 1, color = "black") +
-  geom_abline(
-    intercept = coef(l.interaction)[1] - .5 * coef(l.interaction)[2],
-    slope = coef(l.interaction)[3] - .5 * coef(l.interaction)[4], 
-    linetype = 2, color = "black") +
-  theme_bw()
-```
-
-In the LM with the interaction, the main effect of diffusion constant is the *average* effect of the diffusion constant across the two conditions (because we effect-coded and thus centered condition). The main effect of condition is the *average* across all values of the diffusion constant (because we centered the diffusion constant, so that the effect of condition is the predicted distance between the lines when the centered diffusion constant is zero, i.e., at the mean of the diffusion constant). The interaction tells us how much the slope of the diffusion constant differs between the conditions. Specifically, the slope of the diffusion constant for the crowded condition is predicted to be + 0.008665 * 0.05 = + 0.0043325 larger than the main effect of the diffusion constant (0.032167 + 0.0043325), whereas the slope of the diffusion constant for the uncrowded condition is predicted to be + 0.008665 * -0.05 = - 0.0043325 smaller than the main effect of the diffusion constant (0.032167 - 0.0043325).
-
-
-Note also that the intercept estimate in the interaction model is not identical to the one from the combined model. This seems to contradict what we learned above, that the intercept estimate is the model's prediction for the grand mean if all predictors are centered. Note, however, that we did not center the interaction and, indeed, the mean of the product of condition and DiffusionConstant is *not* 0, but rather
-`r d %>% summarise(mean = mean(DiffusionConstant_c * ifelse(Condition == "Crowded", .5, -.5))) %>% round(3)`. There's thus no contradiction to the generalization that the intercept is the model's predicted overall mean outcome when all variables are centered.^[Since the diffusion constant is not a variable that we controlled directly by our design, it can have different means for the two conditions even after centering it, and indeed it does (centering only guarantees that the *overall* mean of the diffusion constant is 0): In other words, the diffusion constant is itself affected by the condition and, as a consequence, condition and DiffusionConstant are correlated. Here we don't explore this further, but we will return to questions about collinearity later in the semester.]
 
 ### Prepare for class 
  
@@ -711,48 +307,7 @@ Note also that the intercept estimate in the interaction model is not identical 
  6. True or false? Now that we know that the slope of diffusion constant does not significantly differ between the two crowdedness conditions, and given that the effect of diffusion constant was significant, we can conclude that both conditions exhibit a significant effect of the diffusion constant. 
  1. True or false? If we had found a significant interaction between condition and diffusion constant, we could have concluded that the effect of conclusion constant goes in opposite directions for the two conditions? 
  1. When we fit the same interaction model with the uncentered diffusion constant instead, we get a seemingly conflicting result, where condition does not longer have a significant effect. Why is that the case? Is this result really conflicting? (The figure might help. Hint: draw the line segments corresponding to the effect of condition in this new interaction model.)
-
-```{r, fig.cap="Size (in arcminutes) at which threshold performance (62.5\\% correct) was reached by diffusion constant (not-centered) and crowding condition. Each color shows a separate subject. Black lines show the predicted outcome of a linear model fit to the data.", fig.width=4.5, fig.height=4}
-l.temp = lm(Threshold ~ 1 + Condition * DiffusionConstant, data = d)
-summary(l.temp)
-
-d %>%
-  ggplot(aes(x = DiffusionConstant)) +
-  geom_point(aes(y = Threshold, color = Subject, shape = Condition), alpha = .5) +
-  geom_abline(
-    intercept = coef(l.temp)[1] + .5 * coef(l.temp)[2],
-    slope = coef(l.temp)[3] + .5 * coef(l.temp)[4], 
-    linetype = 1, color = "black") +
-  geom_abline(
-    intercept = coef(l.temp)[1] - .5 * coef(l.temp)[2],
-    slope = coef(l.temp)[3] - .5 * coef(l.temp)[4], 
-    linetype = 2, color = "black") +
-  theme_bw() + coord_cartesian(xlim = c(0, 40))
-```
-
  1. Are the predicted/fitted values from this model different from the first interaction model we fit above?
-
-
-## Simple effects
-
-When we have interactions in our model, we might also want to report the *simple effects*. For example, for the two-way interaction between condition and diffusion constant, we might want to report the simple effect of the diffusion constant for each condition. That's necessary because a significant interaction between two predictors $x_1$ and $x_2$ only tells us that the effect of $x_1$ on $y$ differs depending on $x_2$ (or vice versa, that the effect of $x_2$ on $y$ depends on the value of $x_1$). For example, for the present case a significant interaction would have indicated that the slope of diffusion constant differs between the two crowdedness conditions.
-
-**However, a signficant interaction does *not* tell us *how* the interacting effects depends on each other.** For example, for the present case a significant interaction could indicate that there is a significant positive relation between the diffusion constant and threshold in one condition and a significant negative relation in the other condition; but it could also indicate that there is a significant positive relation in one condition and a non-significant relation in the other; or even that the relation is significant and positive in both conditions but the size of the effect of diffusion constant differs between condition (and so on). To address which of those scenarios holds, it is necessary to conduct additional analyses. The standard approach to that is called simple effect analyses.
-
-In this approach, we do not split the data into the two conditions and fit separate models ($Threshold \sim 1 + DiffusionConstant$) to it. Rather, we use all of the data we have and simple re-parameterize/recode the same LM we have already fit to read out the simple effects of DiffusionConstant at each level of condition. In R, this can be done with the convenient embedding operator /. Here's the model matrix resulting from this operator does for the present case:
-
-```{r, echo=T}
-model.matrix( ~ 1 + Condition / DiffusionConstant_c, data = d)
-```
-
-and here is the resulting LM:
-
-```{r}
-summary(lm(Threshold ~ 1 + Condition / DiffusionConstant_c, data = d))
-```
-
-This re-parameterization does not change the predicted/fitted responses of the model (not shown here) or the model fit ($R^2$, F-statistic, etc.; shown). But we now are provided with the effect of the diffusion constant at each level of the condition variable. In this case, we see that the effect of diffusion constant on the threshold is signficant and positive in both conditions.
-
 
 ## Writing up the analysis results
 
@@ -765,69 +320,52 @@ We analyzed the data with a linear regression, using the function \texttt{lm} fr
 
 
 
-# Additional topics we can discuss in class
+# Weibull regression
 
-## Coding of continuous predictors
- + scaling (dividing continuous predictors through the standard deviation). Why is this done? What are the pros and cons? 
- + scaling by dividing through two-times the predictors standard deviation (Gelman, 2008). Why is this done?
- + non-linear transforms of continuous predictors (log-transforming, polynomials)? Why is this done? In what sense does the LM still make a linearity assumption? (see also James et al., 2013, p. 90-92)
+\begin{figure}
+  \centering
+  \begin{subfigure}[b]{0.45\textwidth}
+  \tikz{ %
+    \node[obs] (outcome) {$y_i$} ; %
+    \factor[above=of outcome] {distribution} {left: \textcolor{orange}{$Weibull$}} {} {}; %
+    \node[det, right=of distribution] (shape) {$k$} ; %
+    \node[det, above=of distribution] (mu) {$\lambda_i$} ; %
+    \factor[above=of mu] {link} {left: \textcolor{blue}{$log^{-1} = exp$}} {} {}; %
+    \node[obs, above=of link] (X) {$x_i$} ; %
+    \node[latent, right=of X] (beta) {$\beta$} ; %
+    % plates
+    \plate[inner sep=0.12cm, xshift=-0.06cm, yshift=0.06cm] {plate1} {(mu) (distribution) (link) (X) (outcome) } {$\forall i=1 \ldots N $}; %
+    \edge {distribution} {outcome} ; %
+    \edge {mu, shape} {distribution} ; %
+    \edge {link} {mu} ; %
+    \edge {X, beta} {link} ; %
+  }
+  \caption{only scale parameter ($\lambda$) is inferred}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.45\textwidth}
+  \tikz{ %
+    \node[obs] (outcome) {$y_i$} ; %
+    \factor[above=of outcome] {distribution} {left: \textcolor{orange}{$Weibull$}} {} {}; %
+    \node[latent, right=of distribution] (shape) {$k$} ; %
+    \node[det, above=of distribution] (mu) {$\lambda_i$} ; %
+    \factor[above=of mu] {link} {left: \textcolor{blue}{$log^{-1} = exp$}} {} {}; %
+    \node[obs, above=of link] (X) {$x_i$} ; %
+    \node[latent, right=of X] (beta) {$\beta$} ; %
+    % plates
+    \plate[inner sep=0.12cm, xshift=-0.06cm, yshift=0.06cm] {plate1} {(mu) (distribution) (link) (X) (outcome) } {$\forall i=1 \ldots N $}; %
+    \edge {distribution} {outcome} ; %
+    \edge {mu, shape} {distribution} ; %
+    \edge {link} {mu} ; %
+    \edge {X, beta} {link} ; %
+  }
+  \caption{both shape ($k$ and scale parameters ($\lambda$) are inferred}
+  \end{subfigure}
+  \caption{The Weibull regression is {\em not} a GLM, unless the shape parameter $k$ is fixed (a). The Weibull model with both its scale and shape parameter can thus be seen as an infinite set of GLMs.}
+\end{figure}
 
-### Discussion questions for class
-
- + Can the predictions of models differ depending on the transform of a continuous variable?
- + Can the conclusions we draw about effects differ depending on the transform of a continuous variable?
 
 
-## Coding of factors with more than two levels
-
-```{r, message=F}
-d.all = read_csv("../data/data_ClarkCrowding.csv") %>%
-  mutate_at(c("Subject", "Condition"), factor)
-```
-
- + Testing hypotheses about the order of levels (see also James et al., 2013, p. 85; a nice summary of various coding schemes and how to make your own for R can be found at \url{https://stats.idre.ucla.edu/r/library/r-library-contrast-coding-systems-for-categorical-variables/}). Here are some examples, using all three levels from the complete data---i.e., including the "fixation" condition:
- 
-   + treatment coding
-   
-```{r, echo=T}
-levels(d.all$Condition)
-contrasts(d.all$Condition) = cbind(
-  "C" = c(1, 0, 0),
-  "U" = c(0, 0, 1))
-model.matrix( ~ 1 + Condition * Speed, data = d.all)
-```
-
-   + simple coding
-   + effect ("anova") coding
-   
-```{r, echo=T}
-contrasts(d.all$Condition) = cbind(
-  "C.vs.F" = c(.5,-.5, 0),
-  "U.vs.F" = c(0,-.5, .5))
-model.matrix( ~ 1 + Condition * Speed, data = d.all)
-```
-
-   + Helmert coding (or reverse Helmert coding)
-
-```{r}
-contrasts(d.all$Condition) = contr.helmert(3)
-model.matrix( ~ 1 + Condition * Speed, data = d.all)
-```
-   + sliding difference coding (forward/backward)
-   + polynomial coding (or orthogonal polynomial coding)
-
-```{r}
-contrasts(d.all$Condition) = contr.poly(3)
-model.matrix( ~ 1 + Condition * Speed, data = d.all)
-```
-
- + How do we add and interpret interactions with such multi-level factors? A nice detailed introduction that goes over the interpretation for the different coefficients can be found at \url{https://stats.idre.ucla.edu/other/mult-pkg/faq/general/faq-how-do-i-interpret-the-coefficients-of-an-effect-coded-variable-involved-in-an-interaction-in-a-regression-model/}. R provides many packages that help with the interpretation of higher-order interactions. One is phia (\url{https://cran.r-project.org/web/packages/phia/index.html}).
- 
-### Discussion questions for class
-
- + Can the predictions of models differ depending on the which of the above coding schemes is used for the 3-way factor *condition*?
- + Can the conclusions we draw about effects differ depending on the which of the above coding schemes is used for the 3-way factor *condition*?
- + Does the interpretation of the interaction with the predictor *speed* change depending on the which of the above coding schemes is used for the 3-way factor *condition*?
 
 # Session info
 ```{r session_info, include=TRUE, echo=TRUE, results='markup'}
