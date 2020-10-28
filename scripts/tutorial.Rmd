@@ -195,7 +195,7 @@ read up on weibull
 
 # Reading and assignments in *preparation* of this class
 
-Please make sure you have read *all* of Gelman \& Hill (2007, p. 301-310 in Ch 14) as well as James et al. (2013, Ch. 4 up to but *not* including 4.3.4). To learn more about psychometric models, you might also find Gilchrist et al. (2005) helpful.
+Please make sure you have read *all* of Gelman \& Hill (2007, p. 301-310 in Ch 14) as well as James et al. (2013, Ch. 4 up to but *not* including 4.3.4). To learn more about psychometric models, you might also find Gilchrist et al. (2005) and Wichmann and Hill (2001a, b) helpful (both in Perception & Psychophysics).
 
 Then read and *work through* this document. We will use class to go through the important concepts and to address any questions that you have about the readings or the problem sets in this document. **Please note that this document is providing R code only.** Some of the steps described here might have less direct solutions in Matlab, so it is recommended that you start early. I have, however, tried to describe each step in a way that does not depend on R or Matlab.
 
@@ -250,14 +250,13 @@ When we use an LM to analyze our data, we fit a *specific* LM---i.e., an LM with
 $$ Threshold \sim 1 + Condition $$
 The algorithm implemented in whatever function we use for that (e.g., *fitlm* in Matlab or *lm* in R) then determines the best-fitting estimates of the *coefficients*. In other words, we tell the LM-fitting function the outcome and predictor---the knowns---and the function then determines the coefficients---the unknowns. The resulting combination of the specific LM (the predictors and outcome variables) and the best-fitting coefficient estimates together constitute the **fit** or **fitted (linear) model**. The statistical inferences we draw, and write-up, are always based on such best-fitting models. Here we won't go into detail about how these "best-fitting" estimates and their standard errors are obtained, but we will return to that later in the semester.
 
-## Writing up results
 
-We should **use $\widehat{\beta}$ when we describe coefficient estimates and write up results**. This emphasizes that these are *estimates* of the assumed population parameters ($\beta$). It is worth noting that the $\widehat{\beta}$s are not the only outputs we obtain from a LM fit. This fit also contains, for example, predicted values for each outcome based on the predictors for that observation. But the null hypothesis significance testing (NHST) that we conduct focuses on the best-fitting coefficient estimates and their standard errors. When we write that a predictor did or did not have a statistically significant effect, or when we talk about the size of the effect, those statements refer to the coefficient estimate, its standard error, and measures derived from them.
+
 
 
 # The data for this document
 
-For this tutorial we are continuing to use Ashley Clark's data from her experiment on visual crowding effects on foveal processing. Here's a copy of her description of the data. One difference to the data from her study that you've seen so far is that we're including a third condition that Clark and colleagues collected as a control.
+For this tutorial we are continuing to use Ashley Clark's data from her experiment on visual crowding effects on foveal processing. \textbf{Do not share this data with Ashley's permission. Thank you.}
 
 ## Background
 Crowding is a visual phenomenon that has puzzled scientists for decades; an object in isolation can be perceived without problems, yet surrounding it with similar objects makes it harder to see. While crowding has been studied extensively in the visual periphery, humans normally orient objects in their center of gaze, the high-acuity region of the retina called the foveola. While the foveola is less than 1.5mm wide (or ~1 visual deg2), it contains more cones than rest of the retina combined. Human’s ability to actively perceive the visual world relies heavily on not only the foveola itself, but also how and where the eye is positioned. The few studies that have examined crowding within foveal vision have produced contradictory results. Some reasons for these discrepancies include using relatively large stimuli, a small number of participants, abnormal stimuli presentation, and having indefinite stimulus presentation times with no eye tracking. More recent research, however, has highlighted the importance of precise eye tracking due to the eye’s constant movement during even fixation. These small and constant movements of the eye, called fixational eye movements (FEMs), are beneficial or both high acuity vision, as well as daily tasks such as reading and face recognition. FEM’s have never been examined in the context of crowding, and it remains unknown how individuals in previous crowding studies directed their foveola over stimuli, or even maintained fixation.
@@ -266,32 +265,74 @@ Crowding is a visual phenomenon that has puzzled scientists for decades; an obje
 The goals of this research are to (1) investigate the effect of crowding within the foveola, and (2) examine if and how fixational eye movements influence crowding at this scale. Based on previous research, we hypothesize that crowding will be detrimental to foveal vision, as it is in peripheral vision, but on a finer scale. Further, based on the recent findings that FEMs are beneficial for high-acuity vision, I expect a relationship between FEMs and the strength of crowding within the foveola, with larger and less precise FEMs increasing the negative effects visual crowding.
 
 ## Methods
-Studying FEMs during visual crowding within the foveola requires high-precision eye tracking and accuracy in localizing the center of gaze. Current video eye trackers do not have the required spatial precision, as the error of gaze localization is as large as the foveola itself. However, by using a custom built state-of-the-art eye tracking system with arcminute precision, we will be able to examine exactly how FEMs contribute to crowding within the foveola. Stimuli consist of a number-font designed specifically for studying crowding in the fovea, as it allows for recognition even when numbers are closer together than traditional optotypes used in other crowding studies.6 Two conditions will be examined, the uncrowded (where a single number is presented), and the crowded (where the same size number is presented, but with four surrounding numbers). The size of the number and spacing between the numbers in the crowded condition change throughout the experiment based on the subject’s performance using an adaptive procedure. The stimuli presented will vary in size, ranging from 0.5 arcminutes to 4 arcminutes in width. To determine the number-width threshold, we use a standard psychophysics procedure measuring the width of the stimulus at which a subject performs above chance level. New variables at a trial level include the followding
+Studying FEMs during visual crowding within the foveola requires high-precision eye tracking and accuracy in localizing the center of gaze. Current video eye trackers do not have the required spatial precision, as the error of gaze localization is as large as the foveola itself. However, by using a custom built state-of-the-art eye tracking system with arcminute precision, we will be able to examine exactly how FEMs contribute to crowding within the foveola. Stimuli consist of a number-font designed specifically for studying crowding in the fovea, as it allows for recognition even when numbers are closer together than traditional optotypes used in other crowding studies.6 Two conditions will be examined, the uncrowded (where a single number is presented), and the crowded (where the same size number is presented, but with four surrounding numbers). The size of the number and spacing between the numbers in the crowded condition change throughout the experiment based on the subject’s performance using an adaptive procedure. The stimuli presented will vary in size, ranging from 0.5 arcminutes to 4 arcminutes in width. To determine the number-width threshold, we use a standard psychophysics procedure measuring the width of the stimulus at which a subject performs above chance level. 
 
- * Size: the width (or strokwidth) of the stimulus during that group of trials.
+## Overview
+
+Subject-level variables include:
+
+ * Subject
+ * Condition: "crowded" or "uncrowded"
+ * Threshold: threshold inferred from a previous Weibull model fit to the subjects trial-level data
+ * DiffusionConstant
+ * Span
+ * Area
+ * Curvature
+ * Speed
+
+Size-level variables include:
+
+ * Size: the width (or strokewidth) of the stimulus during that group of trials.
  * Performance: What the overall performance for the size stimulus was.
+ 
+Trial-level variables:
+
  * Response: What number the subject guessed.
  * Answer: What the number presented on the screen was.
- * Correct: Wether the response was correct or not (combining information from Response and Answer)
+ * Correct: Whether the response was correct or not (combining information from Response and Answer)
  * Response Time: response time of subject. Note* subjects were not told to response as quickly as possible during experiment.
  * Traces: the x and y traces of each trial in this size stimulus group.
  * Trial Curvature: Same as curvature above, but for each individual trial.
  * Trial Speed: Same as speed above, but for each individual trial. 
 
-## Overview
+For the present purpose, I'm renaming "Crowded" as "Condition", "Answer" as "ResponseExpected", "Correct" to "ResponseCorrect". I'll also prefix all subject-level variables with "Subject" and remove the "Trial" prefix that is used for some (but not all) of the trial-level variables. Finally, I change "Size" to the more verbose "LetterSize" and since performance refers to the average performance for a specific letter size, I change it to "LetterSize.AvgPerformance". I then order the column from the least quickly varying (across rows) to the most quickly varying.
+
 ```{r load data, message=F}
-d = read_csv("../data/data_ClarkCrowding_TrialLevel.csv") %>%
-  mutate_at(c("Subject", "Condition"), factor)
+d = read_csv("../data/data_ClarkCrowding_TrialLevel.csv") 
 d %<>%
-  filter(Condition != "Fixation") %>%
   na.omit() %>%
-  droplevels()
-d
+  droplevels() %>%
+  rename(
+    Condition = Crowded,
+    Threshold.Subj = Threshold,
+    DiffusionConstant.Subj = DiffusionConstant,
+    Span.Subj = Span,
+    Area.Subj = Area,
+    Curvature.Subj = Curvature,
+    Speed.Subj = Speed,
+    LetterSize = Size,
+    LetterSize.AvgPerformance = Performance,
+    ResponseExpected = Answer,
+    ResponseCorrect = Correct,
+    Curvature = TrialCurvature,
+    Speed = TrialSpeed,
+    Span = TrialSpan
+    ) %>%
+  mutate(Condition = factor(ifelse(Condition == 0, "uncrowded", "crowded"), 
+                            levels = c("uncrowded", "crowded"))) %>%
+  select(Subject, Condition, Threshold.Subj, DiffusionConstant.Subj, Area.Subj, Span.Subj, Speed.Subj, everything(), Span, Speed, Curvature) %>%
+  mutate_at(c("Subject"), factor)
+
+str(d)
 ```
 
+## Available data formats
+
+The git repository contains the data in three formats: a .mat file, and .Rdata file with a single tibble/data.frame object (d), and a .csv file that contains all information except the X and Y traces.
 
 
 
+# NEW
 
 
 ### Prepare for class 
@@ -319,8 +360,70 @@ We analyzed the data with a linear regression, using the function \texttt{lm} fr
 
 
 
+# Psychometric functions
 
-# Weibull regression
+In psychometric modeling, we predict subjects' responses from a stimulus value. A number of different predictive models are frequently used, with choices varying between labs, based on goodness of fit, or field-specific conventions. Of relevance to this class, all of these models fall into the class of non-linear models (NLM) and some are also generalized linear models (GLMs). That is, psychometric functions/modeling is partly a subset of the type of models we cover in this class, and partly closely related. The goal of this section is to illustrate the relation between GL(M)Ms and psychometric functions a bit further, so that your understanding of GL(M)Ms can also inform your analysis choices for psychometric data.
+
+Four commonly used psychometric functions include the cumulative Gaussian, logistic, Weibull, and Gumble (Generalized Extreme Value distribution a.k.a. log Weibull). For formal introductions, the relation between the different functions, and their relative trade-offs, see also the readings listed at the top of this tutorial.
+
+Any of these functions for the stimulus-driven model can be expanded to account for the proportion of trials on which the subject responds independent of the stimulus (e.g., because the subject experienced an attentional lapse) and optionally the bias (or guessing rate) on those lapsing trials. We'll start with some more background on the lapsing model.
+
+# Lapsing model
+
+The lapse model is essentially a mixture model with two components. One component describes the responses that depend on the stimulus (e.g,. the logistic model discussed above), as a function of two parameters $\alpha$ and $\beta$. The specific interpretation of these two parameters depends on the psychometric function, but each of the functions can be parameterized such that $\alpha$ is some targeted threshold performance, and $\beta$ is the 'slope' at that threshold. The second component if the mixture model describes responses that are *in*dependent of the stimulus (i.e., the bias term $\gamma$). The weight of the second component is the lapse rate ($\lambda$):
+
+\begin{align}
+p(response | stimulus, \alpha, \beta, lapse \lambda, bias) = (1-\lambda) * p(response | stimulus, \alpha, \beta) + \lambda * p(response | bias)
+\end{align}
+
+which is also sometimes written as 
+
+\begin{align}
+p(correct response | stimulus, \alpha, \beta, \lambda, \gamma) = (1- \lambda - \gamma) * p(correct response | stimulus, \alpha, \beta) + \gamma
+\end{align}
+
+where $p(correct response | stimulus, \alpha, \beta)$ could be, for example, a logistic GLM, or any of the other common psychometric functions. The resulting model is {\em not} a GLM anymore (but it can still be fit with maximum likelihood fitting). {\bf To develop an intuition} about what the lapse rate ($\lambda$) and bias parameters ($\gamma$) do, check out the interactive website at \url{https://hlplab.shinyapps.io/BayesianIdentificationAndDiscrimination/}. The site's first tab describes category identification (categorization) and perceptual discrimination for two Gaussian categories by an ideal observer. We'll focus on the "Ideal identification" plot (right side, in the middle of the lower half of the screen) and how it changes if you changes as a function of the rate of attentional lapsing (top left) and bias (unclick "Prior as bias" and then try out different biases). The ideal categorization function between two Gaussian categories turns out to be a logistic function (with linear and quadratic stimulus effects)---i.e., one of the psychometric functions mentioned above (and a GLM). So the effects of lapse rate and bias that you see on this site give you an initial idea of how these parameters can affect the fit of psychometric functions.
+
+## Applying a lapsing logistic GLMM to Ashley's data
+
+Were is an example in R using the library {\tt brms} for Bayesian regression modeling, which---among many other things---provides efficient fitting of non-linear models. {\tt brms} converts GL(M)Ms, GA(M)Ms, NL(M)Ms, and a number of other model types into {\tt stan} code. {\tt stan} is a model specification language with interfaces to Matlab, R, Python and other languages. It comes with an efficient sampler. {\tt stan} programs are compiled into C++ code, sampled from, and the resulting posterior samples of the fitted model are returned ... in this case to R's {\tt brms} functions. Using a Bayesian approach has a number of upsides, one of which is that the straightforwardness of obtaining (Bayesian) confidence intervals for any of the parameters in the model.
+
+```{r}
+library(brms)
+
+# Defining a brms formula for the non-linear model. It has three components:
+# the lapse rate, the guess (bias), and the linear predictor eta. Each of these
+# components can be described by a linear predictor. For this psychometric 
+# model we describing eta as the linear combination of the intercept and the 
+# effect of the stimulus. The other two parameters are just described by only
+# their respective 'intercepts'.
+BF <- brmsformula(
+  y ~ guess + (1-guess-lapse) * inv_logit(eta),
+  eta ~ 1 + x,
+  guess ~ 1,
+  lapse ~ 1, 
+  family = bernoulli(link="identity"),
+  nl = TRUE
+) 
+
+# Define weakly regularizing prior, including lower (lb) and upper bounds (ub)
+# for the lapse and guess parameters
+p2 <- c(
+  prior(student_t(7, 0, 10), class = "b", nlpar = "eta"),
+  prior(beta(1, 1), nlpar = "lapse", lb = 0, ub = .1),
+  prior(beta(1, 1), nlpar = "guess", lb = 0, ub = .1)
+)
+
+# Fit the model
+fit_2 <- brm(
+  BF,
+  data = dat,
+  control = list(adapt_delta = 0.99),
+  prior = p2,
+)
+```
+
+## Weibull regression
 
 \begin{figure}
   \centering

@@ -3,34 +3,23 @@ library(magrittr)
 library(R.matlab)
 
 # First let's get the MatLab structure
-s = readMat("data/dataCrowdingEcc_Clark.mat")
+s = readMat("data/data_ClarkCrowding_TrialLevel.mat")
 
-d.fixation = matrix(s$dataCrowding[[1]], nrow=dim(s$dataCrowding[[1]])[3], byrow = T) %>% 
-  as.data.frame() %>%
-  mutate(
-    Subject = 1:10,
-    Condition = "Fixation")
-d.uncrowded = matrix(s$dataCrowding[[2]], nrow=dim(s$dataCrowding[[2]])[3], byrow = T) %>% 
-  as.data.frame() %>%
-  mutate(
-    Subject = 1:10,
-    Condition = "Uncrowded")
-d.crowded = matrix(s$dataCrowding[[3]], nrow=dim(s$dataCrowding[[3]])[3], byrow = T) %>% 
-  as.data.frame() %>%
-  mutate(
-    Subject = 1:10,
-    Condition = "Crowded")
-d = rbind(
-  d.fixation,
-  d.uncrowded,
-  d.crowded)
-
-names(d)[1:6] = dimnames(s$dataCrowding[[1]])[[1]]
+s <- s[[1]]
+d = tibble(.rows = dim(s)[3])
+for (j in unlist(dimnames(s)[1])) {
+    print(paste(j))
+    d %<>%
+      mutate(!! sym(j) := s[j,,])
+}
+  
 d %<>%
-  select(Subject, Condition, everything()) %>%
-  unnest()
+  rowwise() %>%
+  mutate(
+    across(
+      .cols = !contains("traces"),
+      .fns = ~ .x[[1]]))
 
-write_csv(d, path = "data/data_ClarkCrowding_TrialLevel.csv")
-
-
-
+save(d, file = "data/data_ClarkCrowding_TrialLevel.RData", compress = T)
+write_csv(d %>%
+            select(-contains("traces")), path = "data/data_ClarkCrowding_TrialLevel.csv")
