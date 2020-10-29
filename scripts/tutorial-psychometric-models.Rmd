@@ -66,7 +66,9 @@ library(tidyverse) # gotta be tidy
 library(magrittr)  # pipe!
 library(broom)     # working with model output
 library(brms)      # Bayesian GLMMs and NLMMs
-library(ggtheme)   # cool themes!
+
+library(ggthemes)  # cool themes!
+library(scales)    # to plot predictions on original scale of predictor
 ```
 
 ```{r constants, include=F}
@@ -160,16 +162,34 @@ BF <- brmsformula(
 ) 
 ```
 
-For non-linear models, it can be important to incorporate constraints on the parameters, or any knowledge we have about plausible values for the parameters. Since we are taking a Bayesian approach here, this is straightforwardly achieved through the definition of priors. Throughout this tutorial, we only use very weakly regularizing priors---i.e., priors that do not bias the coefficient values in either direction but that 'pull' them closer to zero. In effect, these priors implement Occam's razor: unless there is sufficient evidence in the data itself, we assume that the null hypothesis is true for all of our parameters. We can also define lower and upper bounds (lb and ub in the code) for, e.g., the lapse rate and bias parameters, but we first fit this model without any constraint on the lapse rate and bias:
+For non-linear models, it can be important to incorporate constraints on the parameters, or any knowledge we have about plausible values for the parameters. Since we are taking a Bayesian approach here, this is achieved through the definition of priors. Throughout this tutorial, we only use very weakly regularizing priors---i.e., priors that do not bias the coefficient values in either direction but that 'pull' them closer to zero (following recommendations from \url{https://github.com/stan-dev/stan/wiki/Prior-Choice-Recommendations}). In effect, these priors implement Occam's razor: unless there is sufficient evidence in the data itself, we assume that the null hypothesis is true for all of our parameters. We can also define lower and upper bounds (lb and ub in the code) for, e.g., the lapse rate and bias parameters, but we first fit this model without any constraint on the lapse rate and bias:
 
 ```{r, echo=T}
 # Define weakly regularizing prior, including lower (lb) and upper bounds (ub)
 # for the lapse and guess parameters
 my.priors <- c(
-  prior(student_t(7, 0, 10), class = "b", nlpar = "eta"),
+  prior(student_t(3, 0, 2.5), class = "b", nlpar = "eta"),
   prior(beta(1, 1), nlpar = "lapse", lb = 0, ub = 1),
   prior(beta(1, 1), nlpar = "guess", lb = 0, ub = 1)
 )
+```
+
+So that the priors are on the right 'scale', we follow (Gelman et al., 2008), and standardize the continuous predictors in the model. As is typical for analyses of experimental data with two balanced conditions, we deviation/sum/abova/effect-code the condition variable, with the 'treatment' receiving the positive predictor value:
+
+```{r, echo=T}
+# We store the mean and sd of Size so that we can later transform the model's predictions back 
+# onto the scale of original Size predictor
+Size.mu = mean(d$Size)
+Size.sd = sd(d$Size)
+
+# Standardize Size and make sure order of levels for Condition is as intended
+d %<>%
+    mutate(
+      Condition = factor(Condition, levels = c("uncrowded", "crowded")),
+      Size = (Size - mean(Size)) / sd(Size))
+
+# Sum-code condition
+contrasts(d$Condition) = cbind("Crowded.vs.Uncrowded" = c(-.5,.5))
 ```
 
 Let's fit this model to the data from Subject 1. 
@@ -179,7 +199,9 @@ fit.1 <- brm(
   BF,
   data = d %>%
     filter(Subject == "1"),
-  control = list(adapt_delta = 0.99),
+  control = list(adapt_delta = 0.999),
+  iter = 8000,
+  thin = 5,
   prior = my.priors,
 )
 
@@ -192,14 +214,26 @@ p = plot(marginal_effects(fit.1),
          line_args = list(fullrange = T),
          theme = theme_fivethirtyeight())[[1]] 
 
+unstandardize = function(x) { x * Size.sd + Size.mu }
+standardize = function(x) { (x - Size.mu) / Size.sd }
+
 p.common =  
   list(geom_hline(yintercept = .25, color = "black", linetype = 2),
-  scale_x_continuous(
-    "Letter size",
-    limits = c(0,5)), 
-  scale_y_continuous(
-    "Probability of correct response",
-    limits = c(0,1)))
+       scale_x_continuous(
+         "Letter size",
+         trans = trans_new(
+           "unstandardize",
+           transform = unstandardize,
+           inverse = standardize)), 
+       scale_y_continuous(
+         "Probability of correct response",
+         limits = c(0,1)),
+       coord_trans(
+         x = trans_new(
+           "unstandardize",
+           transform = unstandardize,
+           inverse = standardize)
+       ))
 
 p + p.common
 ```
@@ -210,7 +244,7 @@ We refit the model while constraining the guess and lapse rate to be less than .
 
 ```{r, echo=T}
 my.priors <- c(
-  prior(student_t(7, 0, 10), class = "b", nlpar = "eta"),
+  prior(student_t(3, 0, 2.5), class = "b", nlpar = "eta"),
   prior(beta(1, 1), nlpar = "lapse", lb = 0, ub = .5),
   prior(beta(1, 1), nlpar = "guess", lb = 0, ub = .5)
 )
@@ -249,7 +283,7 @@ BF.lapse <- brmsformula(
 )
 
 my.priors.lapse <- c(
-  prior(student_t(7, 0, 10), class = "b", nlpar = "eta"),
+  prior(student_t(3, 0, 2.5), class = "b", nlpar = "eta"),
   prior(beta(1, 1), nlpar = "lapse", lb = 0, ub = .5)
 )
 ```
@@ -311,10 +345,10 @@ BF.lapse.mixed <- brmsformula(
 
 ```{r, message=F, warning=F, error=F}
 my.priors.lapse <- c(
-  prior(student_t(2.5, 3, 10), class = "b", nlpar = "eta"),
+  prior(student_t(3, 0, 2.5), class = "b", nlpar = "eta"),
   prior(beta(1, 1), nlpar = "lapse", lb = 0, ub = .5),
-  prior(cauchy(0,5), class = "sd", nlpar = "eta"),
-  prior(cauchy(0,5), class = "sd", nlpar = "lapse")
+  prior(cauchy(0,2.5), class = "sd", nlpar = "eta"),
+  prior(cauchy(0,2.5), class = "sd", nlpar = "lapse")
 )
 
 fit.lapse.mixed <- brm(
@@ -322,7 +356,7 @@ fit.lapse.mixed <- brm(
   data = d,
   init = 0,
   iter = 6000,
-  control = list(adapt_delta = 0.99),
+  control = list(adapt_delta = 0.999),
   prior = my.priors.lapse,
 )
 summary(fit.lapse.mixed)
@@ -427,7 +461,7 @@ BF.lapse.mixed.weibull <- brmsformula(
 
 ```{r, message=F, warning=F, error=F}
 my.priors.lapse <- c(
-  prior(student_t(7, 0, 10), class = "b", nlpar = "eta"),
+  prior(student_t(3, 0, 2.5), class = "b", nlpar = "eta"),
   prior(beta(1, 1), nlpar = "lapse", lb = 0, ub = .5),
   prior(cauchy(0,5), class = "sd", nlpar = "eta"),
   prior(cauchy(0,5), class = "sd", nlpar = "lapse")

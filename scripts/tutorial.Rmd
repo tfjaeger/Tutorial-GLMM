@@ -412,7 +412,9 @@ The git repository contains the data in three formats: a .mat file, and .Rdata f
 
 
 
-to do: illustrate random effects.
+# Working through an example
+
+## GLM (logistic regression)
 
 We first deviation-code the crowdedness condition, and center letter size:
 
@@ -423,6 +425,27 @@ contrasts(d$Condition) = cbind("Crowded.vs.Uncrowded" = c(-.5, .5))
 d %<>% 
   mutate(Size = Size - mean(Size))
 ```
+
+Now we analyze the data from one subject (Subject 4) in an ordinary (non-mixed) logististic regression:
+
+```{r, echo=T}
+l = glm(
+  ResponseCorrect ~ 1 + Size + Condition + Size:Condition,
+  data = d,
+  family = binomial)
+
+summary(l)
+```
+
+### Prepare for class 
+ 
+ 1. In your own words, describe in 1-2 sentences the effect of size (for this subject). Is it significant? Is it positive or negative? What does that mean intuitively (describe the effect on the outcome).
+ 1. Do the same for the effect of condition. Use the terms crowded and uncrowded. What is the predicted difference in log-odds of an accurate answer between the two conditions (for this subject). 
+ 1. What's the conceptual interpretation of the interaction for this subject? Try to describe it in your own words.
+ 1. For the uncrowded condition, how would you go from this to calculate the required letter size to achieve 62.5\% threshold accuracy? 
+
+
+## GLMM (mixed-effects logistic regression)
 
 The we fit the mixed-effects logistic regression with the full random effect structure required by the design:
 
@@ -452,10 +475,11 @@ plot_model(
   theme_fivethirtyeight()
 ```
 
-## Prepare for class 
+
+### Prepare for class 
  
  1. Drawing on what you've learned about LMs, GLMs, and GLMMs, write a result section for the above model, and submit it on Slack prior to the class. (The model is exactly the one described in the method write-up at the end of Section 2).
- 2. How could you assess whether the effect of condition is fully mediated (subsumed) by effect of crowded on the *speed* of eye movements, which then causes the effect on accuracy. I.e., how would you test the hypothesis that the causal model for your data is crowdedness of display $\rightarrow$ speed of eye movements $\rightarrow$ accuracy (indirect causation), rather than crowdedness of display $\rightarrow$ accuracy (direct causation)? Describe what you'd want to do in your own words, or try it out (in R, for example, you can compare glmer fits with the anova() function in just the same way that you can compare lm() or glm() fits).
+ 2. How could you assess whether the effect of condition is fully mediated (subsumed) by effect of crowded on the *speed* of eye movements, which then causes the effect on accuracy? I.e., how would you test the hypothesis that the causal model for your data is crowdedness of display $\rightarrow$ speed of eye movements $\rightarrow$ accuracy (indirect causation), rather than crowdedness of display $\rightarrow$ accuracy (direct causation)? Describe what you'd want to do in your own words, or try it out (in R, for example, you can compare glmer fits with the anova() function in just the same way that you can compare lm() or glm() fits).
 
 
 
@@ -480,12 +504,26 @@ plot_model(
   transform = NULL) + 
   theme_fivethirtyeight()
 ```
-The so-called best unbiased linear predictors (BLUPs)---the posterior mode of the random effects for each subjects---can also be extracted from the model. Whereas the points in the above plot reflect the mean of the by-subject effect estimated for each subject, the BLUPs are the mode of that distribution (the value with the highest estimated density). Typically, these two values will be closely related. Take, for example, the BLUP for subject 2's intercept (.7317...) and compare it to the plot (second to last row, last column).
+As is evidence from these plots, the GLMM returns a *distribution* over possible subject-specific adjustment in the intercept and effects. As a *point estimate* of the subject-specific adjustment, we typically use the so-called best unbiased linear predictors (BLUPs)---the posterior *mode* of the random effects for each subjects (the value with the highest estimated density. Whereas the points in the above plot reflect the mean of the by-subject effect estimated for each subject, the BLUPs are the mode of that distribution. Typically, these two values will be closely related. Take, for example, the BLUP for subject 2's intercept (.7317...) and compare it to the plot (second to last row, last column).
 
 ```{r}
 ranef(m)
 ```
 
+### Prepare for class 
+ 
+ 1. What intercept does this model predict for Subject 9? 
+ 1. Is that intercept smaller or larger than the predicted intercept for subject 8? Is it smaller or larger than the predicted population intercept?
+ 1. What intercept does the model predict for a novel Subject that was not part of the data we fit the model to?
+
+### Discussion questions for class
+
+ 4. Calculate the threshold size for Subject 2 in the uncrowded condition?
+ 1. How much does this threshold size differ from that in the crowded condition?
+ 
+ 
+ 
+ 
 
 # Issues during GLMM fitting
 
@@ -517,26 +555,37 @@ While singular fits are not technically an error, we might want to check whether
 
 
 
-### Prepare for class 
- 
- 1. On Figure 3, draw line segment that correspond to the intercept. 
- 1. On Figure 3, draw line segment that correspond to the effect of condition.
- 1. Calculate the slope for the crowded condition from the model output shown above.
- 1. What's a geometric interpretation of an interaction between two *continuous* predictors (x1 and x2)? For this it might be helpful to first think about the geometric interpretation of two additive continuous predictors (a plane over x1 and x2, the height of which is given along the third axis, y)
- 1. True or false? Since the interaction does not have a significant effect, we can safely remove it from the model. 
 
-### Discussion questions for class
 
- 6. True or false? Now that we know that the slope of diffusion constant does not significantly differ between the two crowdedness conditions, and given that the effect of diffusion constant was significant, we can conclude that both conditions exhibit a significant effect of the diffusion constant. 
- 1. True or false? If we had found a significant interaction between condition and diffusion constant, we could have concluded that the effect of conclusion constant goes in opposite directions for the two conditions? 
- 1. When we fit the same interaction model with the uncentered diffusion constant instead, we get a seemingly conflicting result, where condition does not longer have a significant effect. Why is that the case? Is this result really conflicting? (The figure might help. Hint: draw the line segments corresponding to the effect of condition in this new interaction model.)
- 1. Are the predicted/fitted values from this model different from the first interaction model we fit above?
 
-## Writing up the analysis results
 
-\color{lightgray}
-We analyzed the data with a linear regression, using the function \texttt{lm} from the \texttt{base} package (citation with version) of the software \texttt{R} (citation with version). We calculated each subject's mean thresholds for the crowded and uncrowded condition. These 20 threshold values were regressed against condition (deviation-coded: .5 = *crowded* vs. -.5 = *uncrowded*), the diffusion constant **(centered), and their interaction**. We found a statistically significant **main** effect of condition ($\widehat{\beta}=.442, t=4.697, p<.01$), so that subjects reach threshold performance at larger sizes in the crowded condition, compared to the uncrowded condition. We also found a statistically significant effect of the diffusion constant ($\widehat{\beta}=.037, t=5.846, p<.01$), so that larger diffusion constants required larger sizes to achieve threshold performance. **The interaction was not significant ($\widehat{\beta} = 0.009, p > .5$).**
-\color{black}
+
+
+
+
+
+
+
+<!-- ### Prepare for class  -->
+
+<!--  1. On Figure 3, draw line segment that correspond to the intercept.  -->
+<!--  1. On Figure 3, draw line segment that correspond to the effect of condition. -->
+<!--  1. Calculate the slope for the crowded condition from the model output shown above. -->
+<!--  1. What's a geometric interpretation of an interaction between two *continuous* predictors (x1 and x2)? For this it might be helpful to first think about the geometric interpretation of two additive continuous predictors (a plane over x1 and x2, the height of which is given along the third axis, y) -->
+<!--  1. True or false? Since the interaction does not have a significant effect, we can safely remove it from the model.  -->
+
+<!-- ### Discussion questions for class -->
+
+<!--  6. True or false? Now that we know that the slope of diffusion constant does not significantly differ between the two crowdedness conditions, and given that the effect of diffusion constant was significant, we can conclude that both conditions exhibit a significant effect of the diffusion constant.  -->
+<!--  1. True or false? If we had found a significant interaction between condition and diffusion constant, we could have concluded that the effect of conclusion constant goes in opposite directions for the two conditions?  -->
+<!--  1. When we fit the same interaction model with the uncentered diffusion constant instead, we get a seemingly conflicting result, where condition does not longer have a significant effect. Why is that the case? Is this result really conflicting? (The figure might help. Hint: draw the line segments corresponding to the effect of condition in this new interaction model.) -->
+<!--  1. Are the predicted/fitted values from this model different from the first interaction model we fit above? -->
+
+<!-- ## Writing up the analysis results -->
+
+<!-- \color{lightgray} -->
+<!-- We analyzed the data with a linear regression, using the function \texttt{lm} from the \texttt{base} package (citation with version) of the software \texttt{R} (citation with version). We calculated each subject's mean thresholds for the crowded and uncrowded condition. These 20 threshold values were regressed against condition (deviation-coded: .5 = *crowded* vs. -.5 = *uncrowded*), the diffusion constant **(centered), and their interaction**. We found a statistically significant **main** effect of condition ($\widehat{\beta}=.442, t=4.697, p<.01$), so that subjects reach threshold performance at larger sizes in the crowded condition, compared to the uncrowded condition. We also found a statistically significant effect of the diffusion constant ($\widehat{\beta}=.037, t=5.846, p<.01$), so that larger diffusion constants required larger sizes to achieve threshold performance. **The interaction was not significant ($\widehat{\beta} = 0.009, p > .5$).** -->
+<!-- \color{black} -->
 
 
 
