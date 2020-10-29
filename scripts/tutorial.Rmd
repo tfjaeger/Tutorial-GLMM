@@ -407,25 +407,60 @@ The git repository contains the data in three formats: a .mat file, and .Rdata f
 
 ## GLM (logistic regression)
 
-We first deviation-code the crowdedness condition, and center letter size:
+We first deviation-code the crowdedness condition:
 
 ```{r, echo=T}
 levels(d$Condition)
 contrasts(d$Condition) = cbind("Crowded.vs.Uncrowded" = c(-.5, .5))
 
-d %<>% 
-  mutate(Size = Size - mean(Size))
+Size.mu = mean(d$Size)
+
+uncenter = function(x) { return(x + Size.mu) }
+center = function(x) { return(x - Size.mu) }
 ```
 
-Now we analyze the data from one subject (Subject 4) in an ordinary (non-mixed) logististic regression:
+Now we analyze the data from one subject (Subject 4) in an ordinary (non-mixed) logistic regression (we center Size within the model formula because that makes plotting of the data on the original scale of letter size easier for the *R* function below):
 
 ```{r, echo=T}
 l = glm(
-  ResponseCorrect ~ 1 + Size + Condition + Size:Condition,
-  data = d,
+  ResponseCorrect ~ 1 + center(Size) + Condition + center(Size):Condition,
+  data = d %>% 
+    filter(Subject == "4"),
   family = binomial)
 
 summary(l)
+```
+
+```{r, message=F}
+p.common =  
+  list(geom_hline(yintercept = .25, color = "black", linetype = 2), 
+       scale_y_continuous(
+         "Probability of correct response"),
+       theme_fivethirtyeight())
+
+p.common.x =  
+  append(
+    p.common,
+    list(
+       scale_x_continuous(
+         "Letter size"),
+       coord_trans(
+         ylim = c(0,1))))
+
+plot_model(
+  l, 
+  type = "eff",
+  terms = c("Size", "Condition"),
+  show.data = T, 
+  jitter = .025) +
+  p.common.x
+
+plot_model(
+  l, 
+  type = "eff",
+  show.data = T, 
+  jitter = .025)[[2]] +
+  p.common 
 ```
 
 ### Prepare for class 
@@ -442,7 +477,8 @@ The we fit the mixed-effects logistic regression with the full random effect str
 
 ```{r, echo=T}
 m = glmer(
-  ResponseCorrect ~ 1 + Size + Condition + Size:Condition + (1 + Size + Condition + Size:Condition | Subject),
+  ResponseCorrect ~ 1 + center(Size) + Condition + center(Size):Condition + 
+    (1 + center(Size) + Condition + center(Size):Condition | Subject),
   data = d,
   family = binomial)
 
@@ -452,18 +488,26 @@ summary(m)
 We cover convergence problems and warnings of possible singular fits below. For now, let's ignore this warning and plot the model's predictions:
 
 ```{r, message=F}
+# For plotting with plot_model, I'm reparameterizing the model
+mp = glmer(
+  ResponseCorrect ~ 1 + Size + Condition + Size:Condition + 
+    (1 + Size + Condition + Size:Condition | Subject),
+  data = d,
+  family = binomial)
+
 plot_model(
-  m,
+  mp,
   type = "eff",
   show.data = T, 
   jitter = .025)[[1]] + 
-  theme_fivethirtyeight()
+  p.common.x
 
 plot_model(
-  m,
+  mp,
   type = "eff",
+  show.data = T,
   jitter = .025)[[2]] + 
-  theme_fivethirtyeight()
+  p.common
 ```
 
 
