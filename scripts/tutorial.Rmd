@@ -78,15 +78,6 @@ options(
   mc.cores = min(chains, parallel::detectCores()))
 ```
 
-# TO DO
-
-get trial level data
-
-make visualization
-read up on weibull
-
-
-
 
 # Reading and assignments in *preparation* of this class
 
