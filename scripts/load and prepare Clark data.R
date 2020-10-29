@@ -22,4 +22,5 @@ d %<>%
 
 save(d, file = "data/data_ClarkCrowding_TrialLevel.RData", compress = T)
 write_csv(d %>%
-            select(-contains("traces")), path = "data/data_ClarkCrowding_TrialLevel.csv")
+            select(-contains("traces")), 
+          path = "data/data_ClarkCrowding_TrialLevel.csv")

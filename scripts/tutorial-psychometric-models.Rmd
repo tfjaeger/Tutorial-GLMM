@@ -1,0 +1,449 @@
+---
+title: "Psychometric models"
+subtitle: "A brief applied overview"
+author: "T. Florian Jaeger"
+date: \today
+geometry: margin=2cm
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{siunitx}
+  - \usepackage{tabto}
+  - \usepackage{soul}
+  - \usepackage{xcolor}
+  - \usepackage{placeins}
+  - \usepackage{lscape}
+  - \newcommand{\blandscape}{\begin{landscape}}
+  - \newcommand{\elandscape}{\end{landscape}}
+  - \makeatletter\renewcommand{\fps@table}{!ht}\makeatother
+  - \setstcolor{red}
+  - \usepackage{sectsty}
+  - \sectionfont{\color{blue}} 
+  - \subsectionfont{\color{blue}}
+  - \subsubsectionfont{\color{darkgray}}
+  - \usepackage{caption}
+  - \usepackage{subcaption}
+  - \usepackage{tikz}
+  - \usepackage{url}
+  - \usetikzlibrary{bayesnet}
+output:
+  pdf_document: 
+    fig_caption: yes
+    fig_width: 7
+    keep_tex: yes
+    latex_engine: xelatex
+    number_sections: yes
+    toc: yes
+    toc_depth: 4
+  fontsize: 10pt
+---
+
+```{r set-options, include=F}
+library(knitr)
+opts_chunk$set(dev = 'pdf',
+               comment="", 
+               echo=FALSE, warning=TRUE, message=TRUE,
+               cache=FALSE, 
+               size="footnotesize",
+               tidy.opts = list(width.cutoff = 250),
+               fig.width = 8, fig.height = 4.5, fig.align = "center")
+
+def.chunk.hook  <- knitr::knit_hooks$get("chunk")
+knitr::knit_hooks$set(chunk = function(x, options) {
+  x <- def.chunk.hook(x, options)
+  ifelse(options$size != "normalsize", paste0("\n \\", options$size,"\n\n", x, "\n\n \\normalsize"), x)
+})
+
+color_block = function(color) {
+  function(x, options) sprintf('\\color{%s}\\begin{verbatim}%s\\end{verbatim}\\color{black}',
+                               color, x)
+}
+knitr::knit_hooks$set(error = color_block('red'))
+knitr::knit_hooks$set(warning = color_block('orange'))
+```
+
+```{r libraries, include=FALSE}
+library(tidyverse) # gotta be tidy
+library(magrittr)  # pipe!
+library(broom)     # working with model output
+library(brms)      # Bayesian GLMMs and NLMMs
+library(ggtheme)   # cool themes!
+```
+
+```{r constants, include=F}
+chains = 4
+
+options(
+  width = 1000,
+  mc.cores = min(chains, parallel::detectCores()))
+```
+
+# Context
+
+This introduction to psychometric models and their relation to GL(M)Ms uses the same data as the GLMM tutorial. It's best to read it *after* reading the GLMM tutorial.
+
+```{r load data, message=F}
+d = read_csv("../data/data_ClarkCrowding_TrialLevel.csv") 
+d %<>%
+  na.omit() %>%
+  droplevels() %>%
+  rename(
+    Condition = Crowded,
+    Threshold.Subj = Threshold,
+    DiffusionConstant.Subj = DiffusionConstant,
+    Span.Subj = Span,
+    Area.Subj = Area,
+    Curvature.Subj = Curvature,
+    Speed.Subj = Speed,
+    Size = Size,
+    Size.AvgPerformance = Performance,
+    ResponseExpected = Answer,
+    ResponseCorrect = Correct,
+    Curvature = TrialCurvature,
+    Speed = TrialSpeed,
+    Span = TrialSpan
+    ) %>%
+  mutate(Condition = factor(ifelse(Condition == 0, "uncrowded", "crowded"), 
+                            levels = c("uncrowded", "crowded"))) %>%
+  select(Subject, Condition, Threshold.Subj, DiffusionConstant.Subj, Area.Subj, Span.Subj, Speed.Subj, everything(), Span, Speed, Curvature) %>%
+  mutate_at(c("Subject"), factor)
+
+str(d)
+```
+
+
+# Psychometric functions
+
+In psychometric modeling, we predict subjects' responses from a stimulus value. A number of different predictive models are frequently used, with choices varying between labs, based on goodness of fit, or field-specific conventions. Of relevance to this class, all of these models fall into the class of non-linear models (NLM) and some are also generalized linear models (GLMs). That is, psychometric functions/modeling is partly a subset of the type of models we cover in this class, and partly closely related. The goal of this section is to illustrate the relation between GL(M)Ms and psychometric functions a bit further, so that your understanding of GL(M)Ms can also inform your analysis choices for psychometric data.
+
+Four commonly used psychometric functions include the cumulative Gaussian, logistic, Weibull, and Gumble (Generalized Extreme Value distribution a.k.a. log Weibull). For formal introductions, the relation between the different functions, and their relative trade-offs, see also the readings listed at the top of this tutorial.
+
+Any of these functions for the stimulus-driven model can be expanded to account for the proportion of trials on which the subject responds independent of the stimulus (e.g., because the subject experienced an attentional lapse) and optionally the bias (or guessing rate) on those lapsing trials. We'll start with some more background on the lapsing model.
+
+# Lapsing model
+
+The lapse model is essentially a mixture model with two components. One component describes the responses that depend on the stimulus (e.g,. the logistic model discussed above), as a function of two parameters $\alpha$ and $\beta$. The specific interpretation of these two parameters depends on the psychometric function, but each of the functions can be parameterized such that $\alpha$ is some targeted threshold performance, and $\beta$ is the 'slope' at that threshold. The second component if the mixture model describes responses that are *in*dependent of the stimulus (i.e., the bias term $\gamma$). The weight of the second component is the lapse rate ($\lambda$):
+
+\begin{align}
+p(response | stimulus, \alpha, \beta, lapse, bias) = (1-lapse) * p(response | stimulus, \alpha, \beta) + lapse * p(response | bias)
+\end{align}
+
+which is also sometimes written as 
+
+\begin{align}
+p(correct\ response | stimulus, \alpha, \beta, \lambda, \gamma) = (1- \lambda - \gamma) * p(correct\ response | stimulus, \alpha, \beta) + \gamma
+\end{align}
+
+where $p(correct response | stimulus, \alpha, \beta)$ could be, for example, a logistic GLM, or any of the other common psychometric functions. The resulting model is *not* a GLM anymore (but it can still be fit with maximum likelihood fitting). **To develop an intuition** about what the lapse rate ($\lambda$) and bias parameters ($\gamma$) do, check out the interactive website at \url{https://hlplab.shinyapps.io/BayesianIdentificationAndDiscrimination/}. The site's first tab describes category identification (categorization) and perceptual discrimination for two Gaussian categories by an ideal observer. We'll focus on the "Ideal identification" plot (right side, in the middle of the lower half of the screen) and how it changes if you changes as a function of the rate of attentional lapsing (top left) and bias (unclick "Prior as bias" and then try out different biases). The ideal categorization function between two Gaussian categories turns out to be a logistic function (with linear and quadratic stimulus effects)---i.e., one of the psychometric functions mentioned above (and a GLM). So the effects of lapse rate and bias that you see on this site give you an initial idea of how these parameters can affect the fit of psychometric functions.
+
+# Applying a lapsing logistic GLMM to Ashley's data
+
+Were is an example in R using the library \texttt{brms} for Bayesian regression modeling, which---among many other things---provides efficient fitting of non-linear models. \texttt{brms} converts GL(M)Ms, GA(M)Ms, NL(M)Ms, and a number of other model types into \texttt{stan} code. \texttt{stan} is a model specification language with interfaces to Matlab, R, Python and other languages. It comes with an efficient sampler. \texttt{stan} programs are compiled into C++ code, sampled from, and the resulting posterior samples of the fitted model are returned ... in this case to R's \texttt{brms} functions. Using a Bayesian approach has a number of upsides, one of which is that the straightforwardness of obtaining (Bayesian) confidence intervals for any of the parameters in the model.
+
+## Case study: understanding the consequences of assumptions about attentional lapses
+
+As a first illustration, here is the formula describing this model for the case of non-hierarchical data (data from a single subject). \texttt{brms} also allows us a more elegant way to formulate this model directly as a mixture model (see replies to \url{https://discourse.mc-stan.org/t/fitting-lapsing-psychometric-functions-with-brms/5762/2}) but the following non-linear model syntax is perhaps more transparent for the present purpose:
+
+```{r, echo=T}
+# Defining a brms formula for the non-linear model. It has three components:
+# the lapse rate, the guess (bias), and the linear predictor eta. Each of these
+# components can be described by a linear predictor. For this psychometric 
+# model we describing eta as the linear combination of the intercept and the 
+# effect of the stimulus. The other two parameters are just described by only
+# their respective 'intercepts'.
+BF <- brmsformula(
+  ResponseCorrect ~ guess + (1-guess-lapse) * inv_logit(eta),
+  eta ~ 1 + Size,
+  guess ~ 1,
+  lapse ~ 1, 
+  family = bernoulli(link="identity"),
+  nl = TRUE
+) 
+```
+
+For non-linear models, it can be important to incorporate constraints on the parameters, or any knowledge we have about plausible values for the parameters. Since we are taking a Bayesian approach here, this is straightforwardly achieved through the definition of priors. Throughout this tutorial, we only use very weakly regularizing priors---i.e., priors that do not bias the coefficient values in either direction but that 'pull' them closer to zero. In effect, these priors implement Occam's razor: unless there is sufficient evidence in the data itself, we assume that the null hypothesis is true for all of our parameters. We can also define lower and upper bounds (lb and ub in the code) for, e.g., the lapse rate and bias parameters, but we first fit this model without any constraint on the lapse rate and bias:
+
+```{r, echo=T}
+# Define weakly regularizing prior, including lower (lb) and upper bounds (ub)
+# for the lapse and guess parameters
+my.priors <- c(
+  prior(student_t(7, 0, 10), class = "b", nlpar = "eta"),
+  prior(beta(1, 1), nlpar = "lapse", lb = 0, ub = 1),
+  prior(beta(1, 1), nlpar = "guess", lb = 0, ub = 1)
+)
+```
+
+Let's fit this model to the data from Subject 1. 
+
+```{r, message=F, warning=F, error=F}
+fit.1 <- brm(
+  BF,
+  data = d %>%
+    filter(Subject == "1"),
+  control = list(adapt_delta = 0.99),
+  prior = my.priors,
+)
+
+summary(fit.1)
+plot(fit.1)
+p = plot(marginal_effects(fit.1), 
+         plot = F,
+         points = T, 
+         point_args = list(alpha = .05, height = .025, width = .025),
+         line_args = list(fullrange = T),
+         theme = theme_fivethirtyeight())[[1]] 
+
+p.common =  
+  list(geom_hline(yintercept = .25, color = "black", linetype = 2),
+  scale_x_continuous(
+    "Letter size",
+    limits = c(0,5)), 
+  scale_y_continuous(
+    "Probability of correct response",
+    limits = c(0,1)))
+
+p + p.common
+```
+
+This model fit does not converge, and a look at the posterior samples suggests why. This model has the typical hallmarks of unidentifiability with two solutions emerging (symmetrical around 0 log-odds for the logistic part of the model; symmetrica around .5 for the guess and lapse rate, which are expressed on the scale of proportions).
+
+We refit the model while constraining the guess and lapse rate to be less than .5, i.e., less than half of the trials are attentional lapses. This is a very weak assumption. 
+
+```{r, echo=T}
+my.priors <- c(
+  prior(student_t(7, 0, 10), class = "b", nlpar = "eta"),
+  prior(beta(1, 1), nlpar = "lapse", lb = 0, ub = .5),
+  prior(beta(1, 1), nlpar = "guess", lb = 0, ub = .5)
+)
+```
+
+Let's refit the model with these revised priors to the data from Subject 1. This model converges, shows no signs of multimodality in the posterior, and reveals an effect of letter size (the 95\% credible interval does not include 0). The predictions of the model also make sense (e.g., that it converges against chance at 25\%). It is, however, worth noting that there is ** *substantial* uncertainty about the lapse rate and bias terms**. This makes sense: although we have a lot of trials for each subject, we have very little information about the effect of size on the subject's responses since we're only testing at a few points along the size continuum. Additionally, psychometric designs tend to test mostly in the mid-performane part of the continuum. This is the case here, too: note that most of the data is in the middle of this subject's data. These common properties of psychometric designs makes it difficult to reliably distinguish between the effect of stimulus and effects of lapsing.
+
+```{r, message=F, warning=F, error=F}
+fit.2 <- brm(
+  BF,
+  data = d %>%
+    filter(Subject == "1"),
+  control = list(adapt_delta = 0.99),
+  prior = my.priors,
+)
+
+summary(fit.2)
+plot(fit.2)
+p = plot(marginal_effects(fit.2), 
+         plot = F,
+         points = T, 
+         point_args = list(alpha = .05, height = .025, width = .025),
+         line_args = list(fullrange = T),
+         theme = theme_fivethirtyeight())[[1]]
+p + p.common
+```
+What is often done in this type of research is to fix the bias term to the chance level, which is known (here it is .25). Under this simplifying assumption, we can thus rewrite and refit the model. This increases the certainty about the lapse rate parameter, but still leaves substantial uncertainty. This is not a rare scenario: for psychometric data with only a few measurement points along the mid-performance range of the stimulus, we can often not distinguish between effects of attentional lapses and the effect of the stimulus. This is worth noting since higher lapse rates in a model like this one will result in steeper (larger) slope estimates, and will also affect our threshold estimate.
+
+```{r, echo=T}
+BF.lapse <- brmsformula(
+  ResponseCorrect ~ .25 + (.75-lapse) * inv_logit(eta),
+  eta ~ 1 + Size,
+  lapse ~ 1, 
+  family = bernoulli(link="identity"),
+  nl = TRUE
+)
+
+my.priors.lapse <- c(
+  prior(student_t(7, 0, 10), class = "b", nlpar = "eta"),
+  prior(beta(1, 1), nlpar = "lapse", lb = 0, ub = .5)
+)
+```
+
+```{r, message=F, warning=F, error=F}
+fit.lapse.1 <- brm(
+  BF.lapse,
+  data = d %>%
+    filter(Subject == "1"),
+  control = list(adapt_delta = 0.99),
+  prior = my.priors.lapse,
+)
+
+summary(fit.lapse.1)
+p = plot(marginal_effects(fit.lapse.1), 
+         plot = F,
+         points = T, 
+         point_args = list(alpha = .05, height = .025, width = .025),
+         line_args = list(fullrange = T),
+         theme = theme_fivethirtyeight())[[1]]
+p + p.common
+```
+
+## Determining the subject-specific threshold
+
+From a model like that fit in the previous section, we can obtain both naive and lapse-corrected performance thresholds. For lapse-corrected threshold, we need to simple solve the logistic part of the model for the desired threshold. 
+
+\begin{align}
+logit(threshold) & = & \alpha + \beta * Size 
+\end{align}
+
+For example, for a threshold of .625, we set:
+
+\begin{align}
+logit(.625) & = & \alpha + \beta * Size & \Rightarrow \\
+0.5108256 & = & -6.86 + 5.37 * Size & \Leftrightarrow \\
+1.372593 & = & Size
+\end{align}
+
+```{r, warning=F}
+p + 
+  p.common +
+  geom_segment(x = 1.372593, xend = 1.372593, y = 0, yend = qlogis(.625), color = "red", inherit.aes = F)
+```
+
+## Combining the data from all subjects
+
+One appeal of approaching psychometric data from the perspective of GLMMs is that we can apply the same random effect approach as in GLMMs for the lapse rate model (which then falls into the class of NLMMs). Note that this is a bit more data (all 6500 or so trials), and the model is more complex, so this will take a moment to complete. On my machine it took about 10 minutes.
+
+```{r, echo=T}
+BF.lapse.mixed <- brmsformula(
+  ResponseCorrect ~ .25 + (.75-lapse) * inv_logit(eta),
+  eta ~ 1 + Size + (1 + Size | Subject),
+  lapse ~ 1 + (1 | Subject), 
+  family = bernoulli(link="identity"),
+  nl = TRUE
+)
+```
+
+```{r, message=F, warning=F, error=F}
+my.priors.lapse <- c(
+  prior(student_t(2.5, 3, 10), class = "b", nlpar = "eta"),
+  prior(beta(1, 1), nlpar = "lapse", lb = 0, ub = .5),
+  prior(cauchy(0,5), class = "sd", nlpar = "eta"),
+  prior(cauchy(0,5), class = "sd", nlpar = "lapse")
+)
+
+fit.lapse.mixed <- brm(
+  BF.lapse.mixed,
+  data = d,
+  init = 0,
+  iter = 6000,
+  control = list(adapt_delta = 0.99),
+  prior = my.priors.lapse,
+)
+summary(fit.lapse.mixed)
+
+d.fitted = fit.lapse.mixed %>% 
+  spread_draws(
+    b_eta_Intercept,
+    b_eta_Size,
+    b_lapse_Intercept,
+    r_Subject__eta[Subject, coef],
+    r_Subject__lapse[Subject, coef],
+    n = 50) %>%
+  pivot_wider(
+    names_from = coef,
+    values_from = r_Subject__eta,
+  ) %>%
+  mutate(
+    b_eta_Intercept = b_eta_Intercept + Intercept,
+    b_eta_b_Size = b_eta_b_Size + Size
+  ) %>%
+  select(-c(Intercept, Size))
+
+d.fitted %<>%
+  expand(
+    nesting(
+      .draw, 
+      b_eta_Intercept,
+      b_eta_Size,
+      b_lapse_Intercept),
+    Size = seq(0, 5, .1)
+  )
+  ggplot(aes(x = Size, color = Subject, group = .draw)) +
+    geom_line(
+      aes(y = inv_logit_scaled(
+        b_eta_Intercept + b_eta_Size * Size, 
+        lb = .25, 
+        ub = 1 - .25 - b_lapse_Intercept)),
+      alpha = .1) +
+    theme_fivethirtyeight() +
+    p.common
+  
+  
+  
+  mix <- mixture(bernoulli("probit"), bernoulli(“probit”)) 
+fit_mix <- brm(bf(y ~ 1, mu1 ~ x, mu2 ~ 1), data = dat, family = mix)
+
+```
+
+# Weibull regression
+
+\begin{figure}
+  \centering
+  \begin{subfigure}[b]{0.45\textwidth}
+  \tikz{ %
+    \node[obs] (outcome) {$y_i$} ; %
+    \factor[above=of outcome] {distribution} {left: \textcolor{orange}{$Weibull$}} {} {}; %
+    \node[det, right=of distribution] (shape) {$k$} ; %
+    \node[det, above=of distribution] (mu) {$\lambda_i$} ; %
+    \factor[above=of mu] {link} {left: \textcolor{blue}{$log^{-1} = exp$}} {} {}; %
+    \node[obs, above=of link] (X) {$x_i$} ; %
+    \node[latent, right=of X] (beta) {$\beta$} ; %
+    % plates
+    \plate[inner sep=0.12cm, xshift=-0.06cm, yshift=0.06cm] {plate1} {(mu) (distribution) (link) (X) (outcome) } {$\forall i=1 \ldots N $}; %
+    \edge {distribution} {outcome} ; %
+    \edge {mu, shape} {distribution} ; %
+    \edge {link} {mu} ; %
+    \edge {X, beta} {link} ; %
+  }
+  \caption{only scale parameter ($\lambda$) is inferred}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.45\textwidth}
+  \tikz{ %
+    \node[obs] (outcome) {$y_i$} ; %
+    \factor[above=of outcome] {distribution} {left: \textcolor{orange}{$Weibull$}} {} {}; %
+    \node[latent, right=of distribution] (shape) {$k$} ; %
+    \node[det, above=of distribution] (mu) {$\lambda_i$} ; %
+    \factor[above=of mu] {link} {left: \textcolor{blue}{$log^{-1} = exp$}} {} {}; %
+    \node[obs, above=of link] (X) {$x_i$} ; %
+    \node[latent, right=of X] (beta) {$\beta$} ; %
+    % plates
+    \plate[inner sep=0.12cm, xshift=-0.06cm, yshift=0.06cm] {plate1} {(mu) (distribution) (link) (X) (outcome) } {$\forall i=1 \ldots N $}; %
+    \edge {distribution} {outcome} ; %
+    \edge {mu, shape} {distribution} ; %
+    \edge {link} {mu} ; %
+    \edge {X, beta} {link} ; %
+  }
+  \caption{both shape ($k$ and scale parameters ($\lambda$) are inferred}
+  \end{subfigure}
+  \caption{The Weibull regression is {\em not} a GLM, unless the shape parameter $k$ is fixed (a). The Weibull model with both its scale and shape parameter can thus be seen as an infinite set of GLMs.}
+\end{figure}
+
+```{r, echo=T}
+BF.lapse.mixed.weibull <- brmsformula(
+  ResponseCorrect ~ .25 + (.75-lapse) * inv_logit(eta),
+  eta ~ 1 + Size + (1 + Size | Subject),
+  lapse ~ 1 + (1 | Subject), 
+  family = list(bernoulli(link="identity")),
+  nl = TRUE
+)
+```
+
+```{r, message=F, warning=F, error=F}
+my.priors.lapse <- c(
+  prior(student_t(7, 0, 10), class = "b", nlpar = "eta"),
+  prior(beta(1, 1), nlpar = "lapse", lb = 0, ub = .5),
+  prior(cauchy(0,5), class = "sd", nlpar = "eta"),
+  prior(cauchy(0,5), class = "sd", nlpar = "lapse")
+)
+
+fit.lapse.mixed.weibull <- brm(
+  BF.lapse.mixed,
+  data = d,
+  init = 0,
+  iter = 6000,
+  control = list(adapt_delta = 0.99),
+  prior = my.priors.lapse,
+)
+```
+
+# Session info
+```{r session_info, include=TRUE, echo=TRUE, results='markup'}
+devtools::session_info()
+```
