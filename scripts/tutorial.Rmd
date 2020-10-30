@@ -85,7 +85,7 @@ Please make sure you have read Gelman \& Hill (2007, p. 301-310 in Ch 14) as wel
 
 Then read and *work through* this document. We will use class to go through the important concepts and to address any questions that you have about the readings or the problem sets in this document. **Please note that this document is providing R code only.** Some of the steps described here might have less direct solutions in Matlab, so it is recommended that you start early. I have, however, tried to describe each step in a way that does not depend on R or Matlab.
 
-In this document, you will find sections labeled "Prepare for class". Please work through those examples and write up your answers. If there are a few questions, you cannot answer, elicit help on the slack channel. In addition, there are sections called "Discussion questions for class". Please think about these questions, but don't worry if you get stuck. These are some questions we can go through during class.
+In this document, you will find sections labeled "Prepare for class". **Please work through those examples and write up your answers. This time please submit your answers to slack and discuss them there. Everyone should either submit an answer for each question, or discuss why they got stuck.** In addition, there are sections called "Discussion questions for class". Please think about these questions, but don't worry if you get stuck. These are some questions we can go through during class.
 
 ## Additional readings
 
@@ -320,20 +320,36 @@ For simple factorial designs, the unintuitive scales on which the effects of the
 
 
 
-# The data for this document
+
+
+
+
+
+# Working through a real example
+
+The goal of this homework example is to familiarize yourself with the use of logistic and mixed-effects logistic regression in a real-life research context. Work through the examples below with the goal to arrive at a write-up of a result section that addresses the two working hypotheses introduced below (H1 and H2).
+
+## Research background
+Crowding is a visual phenomenon that has puzzled scientists for decades; an object in isolation can be perceived without problems, yet surrounding it with similar objects makes it harder to see. While crowding has been studied extensively in the visual periphery, humans normally orient objects in their center of gaze, the high-acuity region of the retina called the foveola. While the foveola is less than 1.5mm wide (or ~1 visual deg2), it contains more cones than rest of the retina combined. Human’s ability to actively perceive the visual world relies heavily on not only the foveola itself, but also how and where the eye is positioned. The few studies that have examined crowding within foveal vision have produced contradictory results. Some reasons for these discrepancies include using relatively large stimuli, a small number of participants, abnormal stimuli presentation, and having indefinite stimulus presentation times with no eye tracking. More recent research, however, has highlighted the importance of precise eye tracking due to the eye’s constant movement during even fixation. These small and constant movements of the eye, called fixational eye movements (FEMs), are beneficial or both high acuity vision, as well as daily tasks such as reading and face recognition. FEM’s have never been examined in the context of crowding, and it remains unknown how individuals in previous crowding studies directed their foveola over stimuli, or even maintained fixation.
+
+### Research goals
+The goals of this research are to (1) investigate the effect of crowding within the foveola, and (2) examine if and how fixational eye movements influence crowding at this scale. Based on previous research, we hypothesize that crowding will be detrimental to foveal vision, as it is in peripheral vision, but on a finer scale. Further, based on the recent findings that FEMs are beneficial for high-acuity vision, I expect a relationship between FEMs and the strength of crowding within the foveola, with larger and less precise FEMs increasing the negative effects visual crowding.
+
+## Research hypothesis to be tested in this tutorial
+Here, your goal is to test whether crowding---operationalized through two crowding conditions described below---affects the accuracy of number recognition. You will assess this while controlling for the size of the letters/numbers on the screen, as stimulus size is known to have large effects on recognition accuracy. We test two working hypotheses:
+
+ (H1) Crowding will reduce recognition accuracy (after controlling for letter size)
+ (H2) Letter size will have an increased effect in the more crowded displays.
+
+
+## Data
 
 For this tutorial we are continuing to use Ashley Clark's data from her experiment on visual crowding effects on foveal processing. \textbf{Do not share this data with Ashley's permission. Thank you.}
 
-## Background
-Crowding is a visual phenomenon that has puzzled scientists for decades; an object in isolation can be perceived without problems, yet surrounding it with similar objects makes it harder to see. While crowding has been studied extensively in the visual periphery, humans normally orient objects in their center of gaze, the high-acuity region of the retina called the foveola. While the foveola is less than 1.5mm wide (or ~1 visual deg2), it contains more cones than rest of the retina combined. Human’s ability to actively perceive the visual world relies heavily on not only the foveola itself, but also how and where the eye is positioned. The few studies that have examined crowding within foveal vision have produced contradictory results. Some reasons for these discrepancies include using relatively large stimuli, a small number of participants, abnormal stimuli presentation, and having indefinite stimulus presentation times with no eye tracking. More recent research, however, has highlighted the importance of precise eye tracking due to the eye’s constant movement during even fixation. These small and constant movements of the eye, called fixational eye movements (FEMs), are beneficial or both high acuity vision, as well as daily tasks such as reading and face recognition. FEM’s have never been examined in the context of crowding, and it remains unknown how individuals in previous crowding studies directed their foveola over stimuli, or even maintained fixation.
-
-## Goals
-The goals of this research are to (1) investigate the effect of crowding within the foveola, and (2) examine if and how fixational eye movements influence crowding at this scale. Based on previous research, we hypothesize that crowding will be detrimental to foveal vision, as it is in peripheral vision, but on a finer scale. Further, based on the recent findings that FEMs are beneficial for high-acuity vision, I expect a relationship between FEMs and the strength of crowding within the foveola, with larger and less precise FEMs increasing the negative effects visual crowding.
-
-## Methods
+### Methods
 Studying FEMs during visual crowding within the foveola requires high-precision eye tracking and accuracy in localizing the center of gaze. Current video eye trackers do not have the required spatial precision, as the error of gaze localization is as large as the foveola itself. However, by using a custom built state-of-the-art eye tracking system with arcminute precision, we will be able to examine exactly how FEMs contribute to crowding within the foveola. Stimuli consist of a number-font designed specifically for studying crowding in the fovea, as it allows for recognition even when numbers are closer together than traditional optotypes used in other crowding studies.6 Two conditions will be examined, the uncrowded (where a single number is presented), and the crowded (where the same size number is presented, but with four surrounding numbers). The size of the number and spacing between the numbers in the crowded condition change throughout the experiment based on the subject’s performance using an adaptive procedure. The stimuli presented will vary in size, ranging from 0.5 arcminutes to 4 arcminutes in width. To determine the number-width threshold, we use a standard psychophysics procedure measuring the width of the stimulus at which a subject performs above chance level. 
 
-## Overview
+### Overview
 
 Subject-level variables include:
 
@@ -391,19 +407,13 @@ d %<>%
 str(d)
 ```
 
-## Available data formats
+### Available data formats
 
 The git repository contains the data in three formats: a .mat file, and .Rdata file with a single tibble/data.frame object (d), and a .csv file that contains all information except the X and Y traces.
 
 
 
 
-
-
-
-
-
-# Working through an example
 
 ## GLM (logistic regression)
 
@@ -419,7 +429,7 @@ uncenter = function(x) { return(x + Size.mu) }
 center = function(x) { return(x - Size.mu) }
 ```
 
-Now we analyze the data from one subject (Subject 4) in an ordinary (non-mixed) logistic regression (we center Size within the model formula because that makes plotting of the data on the original scale of letter size easier for the *R* function below):
+Now we analyze the data from one subject (Subject 4) in an ordinary non-mixed logistic regression (we center Size within the model formula because that makes plotting of the data on the original scale of letter size easier for the *R* function below):
 
 ```{r, echo=T}
 l = glm(
@@ -430,6 +440,8 @@ l = glm(
 
 summary(l)
 ```
+
+We now plot the predictions from this GLM. The dashed lines indicate the expected chance accuracy under guessing (25% since the experiment employed four different target numbers, all of which occurred equally often across trials, and subjects had to respond which of the four numbers they saw):
 
 ```{r, message=F}
 p.common =  
@@ -468,8 +480,13 @@ plot_model(
  1. In your own words, describe in 1-2 sentences the effect of size (for this subject). Is it significant? Is it positive or negative? What does that mean intuitively (describe the effect on the outcome).
  1. Do the same for the effect of condition. Use the terms crowded and uncrowded. What is the predicted difference in log-odds of an accurate answer between the two conditions (for this subject). 
  1. What's the conceptual interpretation of the interaction for this subject? Try to describe it in your own words.
+ 1. What are your conclusions with regard to H1 and H2 for this subject?
  1. For the uncrowded condition, how would you go from this to calculate the required letter size to achieve 62.5\% threshold accuracy? 
+ 
+### Discussion questions for class
 
+ 6. Do you see any issues with this model? (compare the model predictions to the expected 25% under random guessing)
+ 1. What causes these issues? I.e., what assumption of the model might we need to question?
 
 ## GLMM (mixed-effects logistic regression)
 
@@ -549,12 +566,13 @@ ranef(m)
  
  1. What intercept does this model predict for Subject 9? 
  1. Is that intercept smaller or larger than the predicted intercept for subject 8? Is it smaller or larger than the predicted population intercept?
- 1. What intercept does the model predict for a novel Subject that was not part of the data we fit the model to?
+ 1. What are your conclusions with regard to H1 and H2?
 
 ### Discussion questions for class
 
  4. Calculate the threshold size for Subject 2 in the uncrowded condition?
  1. How much does this threshold size differ from that in the crowded condition?
+ 1. What intercept does the model predict for a novel Subject that was not part of the data we fit the model to?
  
  
  
