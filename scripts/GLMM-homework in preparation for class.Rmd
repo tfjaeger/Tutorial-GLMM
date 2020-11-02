@@ -89,8 +89,7 @@ In this document, you will find sections labeled "Prepare for class". **Please w
 
 ## Additional readings
 
-For logistic regression another *optional* reading is James et al. (2013, Ch. 4 up to but *not* including 4.3.4). To learn more about psychometric models, you might also find Gilchrist et al. (2005) and Wichmann and Hill (2001a, b) helpful (both in *Perception & Psychophysics*).
-
+For logistic regression another *optional* reading is James et al. (2013, Ch. 4 up to but *not* including 4.3.4). 
 
 
 
@@ -494,7 +493,12 @@ m = glmer(
   ResponseCorrect ~ 1 + center(Size) + Condition + center(Size):Condition + 
     (1 + center(Size) + Condition + center(Size):Condition | Subject),
   data = d,
-  family = binomial,)
+  control = glmerControl(
+    optimizer = c("bobyqa"),
+    optCtrl = list(
+      npt = 10,
+      maxfun = 2e6)),
+  family = binomial)
 
 summary(m)
 ```
@@ -606,36 +610,6 @@ While singular fits are not technically an error, we might want to check whether
 
 
 
-
-
-
-
-
-
-
-
-
-
-<!-- ### Prepare for class  -->
-
-<!--  1. On Figure 3, draw line segment that correspond to the intercept.  -->
-<!--  1. On Figure 3, draw line segment that correspond to the effect of condition. -->
-<!--  1. Calculate the slope for the crowded condition from the model output shown above. -->
-<!--  1. What's a geometric interpretation of an interaction between two *continuous* predictors (x1 and x2)? For this it might be helpful to first think about the geometric interpretation of two additive continuous predictors (a plane over x1 and x2, the height of which is given along the third axis, y) -->
-<!--  1. True or false? Since the interaction does not have a significant effect, we can safely remove it from the model.  -->
-
-<!-- ### Discussion questions for class -->
-
-<!--  6. True or false? Now that we know that the slope of diffusion constant does not significantly differ between the two crowdedness conditions, and given that the effect of diffusion constant was significant, we can conclude that both conditions exhibit a significant effect of the diffusion constant.  -->
-<!--  1. True or false? If we had found a significant interaction between condition and diffusion constant, we could have concluded that the effect of conclusion constant goes in opposite directions for the two conditions?  -->
-<!--  1. When we fit the same interaction model with the uncentered diffusion constant instead, we get a seemingly conflicting result, where condition does not longer have a significant effect. Why is that the case? Is this result really conflicting? (The figure might help. Hint: draw the line segments corresponding to the effect of condition in this new interaction model.) -->
-<!--  1. Are the predicted/fitted values from this model different from the first interaction model we fit above? -->
-
-<!-- ## Writing up the analysis results -->
-
-<!-- \color{lightgray} -->
-<!-- We analyzed the data with a linear regression, using the function \texttt{lm} from the \texttt{base} package (citation with version) of the software \texttt{R} (citation with version). We calculated each subject's mean thresholds for the crowded and uncrowded condition. These 20 threshold values were regressed against condition (deviation-coded: .5 = *crowded* vs. -.5 = *uncrowded*), the diffusion constant **(centered), and their interaction**. We found a statistically significant **main** effect of condition ($\widehat{\beta}=.442, t=4.697, p<.01$), so that subjects reach threshold performance at larger sizes in the crowded condition, compared to the uncrowded condition. We also found a statistically significant effect of the diffusion constant ($\widehat{\beta}=.037, t=5.846, p<.01$), so that larger diffusion constants required larger sizes to achieve threshold performance. **The interaction was not significant ($\widehat{\beta} = 0.009, p > .5$).** -->
-<!-- \color{black} -->
 
 
 
