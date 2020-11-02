@@ -1,0 +1,198 @@
+---
+title: "Generalized Linear Mixed/Multilevel Models (GLMMs)"
+subtitle: "An applied tutorial"
+author: "T. Florian Jaeger"
+date: \today
+geometry: margin=2cm
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{siunitx}
+  - \usepackage{tabto}
+  - \usepackage{soul}
+  - \usepackage{xcolor}
+  - \usepackage{placeins}
+  - \usepackage{lscape}
+  - \newcommand{\blandscape}{\begin{landscape}}
+  - \newcommand{\elandscape}{\end{landscape}}
+  - \makeatletter\renewcommand{\fps@table}{!ht}\makeatother
+  - \setstcolor{red}
+  - \usepackage{sectsty}
+  - \sectionfont{\color{blue}} 
+  - \subsectionfont{\color{blue}}
+  - \subsubsectionfont{\color{darkgray}}
+  - \usepackage{caption}
+  - \usepackage{subcaption}
+  - \usepackage{tikz}
+  - \usepackage{url}
+  - \usetikzlibrary{bayesnet}
+output:
+  pdf_document: 
+    fig_caption: yes
+    fig_width: 7
+    keep_tex: yes
+    latex_engine: xelatex
+    number_sections: yes
+    toc: yes
+    toc_depth: 4
+  fontsize: 10pt
+---
+
+```{r set-options, include=F}
+library(knitr)
+opts_chunk$set(dev = 'pdf',
+               comment="", 
+               echo=FALSE, warning=TRUE, message=TRUE,
+               cache=FALSE, 
+               size="footnotesize",
+               tidy.opts = list(width.cutoff = 250),
+               fig.width = 8, fig.height = 4.5, fig.align = "center")
+
+def.chunk.hook  <- knitr::knit_hooks$get("chunk")
+knitr::knit_hooks$set(chunk = function(x, options) {
+  x <- def.chunk.hook(x, options)
+  ifelse(options$size != "normalsize", paste0("\n \\", options$size,"\n\n", x, "\n\n \\normalsize"), x)
+})
+
+color_block = function(color) {
+  function(x, options) sprintf('\\color{%s}\\begin{verbatim}%s\\end{verbatim}\\color{black}',
+                               color, x)
+}
+knitr::knit_hooks$set(error = color_block('red'))
+knitr::knit_hooks$set(warning = color_block('orange'))
+```
+
+```{r libraries, include=FALSE}
+library(tidyverse) # gotta be tidy
+library(magrittr)  # pipe!
+library(broom)     # working with model output
+library(lme4)      # frequentist GLMMs
+library(sjPlot)
+library(ggthemes)   # nice themes
+```
+
+```{r constants, include=F}
+chains = 4
+
+options(
+  width = 1000,
+  mc.cores = min(chains, parallel::detectCores()))
+```
+
+
+
+# Overview
+This document is intended as in-class material. Make sure to first work through the homework in preparation for this class. We now continue to work through the same data set as in the homework.
+
+```{r load data, include=F}
+d = read_csv("../data/data_ClarkCrowding_TrialLevel.csv") 
+d %<>%
+  droplevels() %>%
+  rename(
+    Condition = Crowded,
+    Threshold.Subj = Threshold,
+    DiffusionConstant.Subj = DiffusionConstant,
+    Span.Subj = Span,
+    Area.Subj = Area,
+    Curvature.Subj = Curvature,
+    Speed.Subj = Speed,
+    Size = Size,
+    Size.AvgPerformance = Performance,
+    ResponseExpected = Answer,
+    ResponseCorrect = Correct,
+    Curvature = TrialCurvature,
+    Speed = TrialSpeed,
+    Span = TrialSpan
+    ) %>%
+  mutate(Condition = factor(ifelse(Condition == 0, "uncrowded", "crowded"), 
+                            levels = c("uncrowded", "crowded"))) %>%
+  select(Subject, Condition, Threshold.Subj, DiffusionConstant.Subj, Area.Subj, Span.Subj, Speed.Subj, everything(), Span, Speed, Curvature) %>%
+  mutate_at(c("Subject"), factor)
+
+str(d)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+The we fit the mixed-effects logistic regression with the full random effect structure required by the design:
+
+```{r, echo=T}
+m = glmer(
+  ResponseCorrect ~ 1 + center(Size) + Condition + center(Size):Condition + 
+    (1 + center(Size) + Condition + center(Size):Condition | Subject),
+  data = d,
+  control = glmerControl(
+    optimizer = c("bobyqa"),
+    optCtrl = list(
+      npt = 10,
+      maxfun = 2e6)),
+  family = binomial)
+
+summary(m)
+```
+
+We cover convergence problems and warnings of possible singular fits below. For now, let's ignore this warning and plot the model's predictions:
+
+```{r, message=F, warning=F, error=F}
+# For plotting with plot_model, I'm reparameterizing the model
+mp = glmer(
+  ResponseCorrect ~ 1 + Size + Condition + Size:Condition + 
+    (1 + Size + Condition + Size:Condition | Subject),
+  data = d,
+  family = binomial)
+
+plot_model(
+  mp,
+  type = "eff",
+  show.data = T, 
+  jitter = .025)[[1]] + 
+  p.common.x
+
+plot_model(
+  mp,
+  type = "eff",
+  show.data = T,
+  jitter = .025)[[2]] + 
+  p.common
+```
+
+
+
+
+
+
+<!-- ### Prepare for class  -->
+
+<!--  1. On Figure 3, draw line segment that correspond to the intercept.  -->
+<!--  1. On Figure 3, draw line segment that correspond to the effect of condition. -->
+<!--  1. Calculate the slope for the crowded condition from the model output shown above. -->
+<!--  1. What's a geometric interpretation of an interaction between two *continuous* predictors (x1 and x2)? For this it might be helpful to first think about the geometric interpretation of two additive continuous predictors (a plane over x1 and x2, the height of which is given along the third axis, y) -->
+<!--  1. True or false? Since the interaction does not have a significant effect, we can safely remove it from the model.  -->
+
+<!-- ### Discussion questions for class -->
+
+<!--  6. True or false? Now that we know that the slope of diffusion constant does not significantly differ between the two crowdedness conditions, and given that the effect of diffusion constant was significant, we can conclude that both conditions exhibit a significant effect of the diffusion constant.  -->
+<!--  1. True or false? If we had found a significant interaction between condition and diffusion constant, we could have concluded that the effect of conclusion constant goes in opposite directions for the two conditions?  -->
+<!--  1. When we fit the same interaction model with the uncentered diffusion constant instead, we get a seemingly conflicting result, where condition does not longer have a significant effect. Why is that the case? Is this result really conflicting? (The figure might help. Hint: draw the line segments corresponding to the effect of condition in this new interaction model.) -->
+<!--  1. Are the predicted/fitted values from this model different from the first interaction model we fit above? -->
+
+<!-- ## Writing up the analysis results -->
+
+<!-- \color{lightgray} -->
+<!-- We analyzed the data with a linear regression, using the function \texttt{lm} from the \texttt{base} package (citation with version) of the software \texttt{R} (citation with version). We calculated each subject's mean thresholds for the crowded and uncrowded condition. These 20 threshold values were regressed against condition (deviation-coded: .5 = *crowded* vs. -.5 = *uncrowded*), the diffusion constant **(centered), and their interaction**. We found a statistically significant **main** effect of condition ($\widehat{\beta}=.442, t=4.697, p<.01$), so that subjects reach threshold performance at larger sizes in the crowded condition, compared to the uncrowded condition. We also found a statistically significant effect of the diffusion constant ($\widehat{\beta}=.037, t=5.846, p<.01$), so that larger diffusion constants required larger sizes to achieve threshold performance. **The interaction was not significant ($\widehat{\beta} = 0.009, p > .5$).** -->
+<!-- \color{black} -->
+
+
+
+# Session info
+```{r session_info, include=TRUE, echo=TRUE, results='markup'}
+devtools::session_info()
+```
