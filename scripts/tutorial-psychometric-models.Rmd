@@ -218,7 +218,7 @@ Size.sd = sd(d$Size)
 d %<>%
     mutate(
       Condition = factor(Condition, levels = c("uncrowded", "crowded")),
-      Size = (Size - mean(Size)) / sd(Size))
+      Size = (Size - mean(Size)) / (2 * sd(Size)))
 
 # Sum-code condition
 contrasts(d$Condition) = cbind("Crowded.vs.Uncrowded" = c(-.5,.5))
