@@ -1,6 +1,6 @@
 ---
 title: "Generalized Linear Mixed/Multilevel Models (GLMMs)"
-subtitle: "An applied tutorial"
+subtitle: "In-class materials"
 author: "T. Florian Jaeger"
 date: \today
 geometry: margin=2cm
