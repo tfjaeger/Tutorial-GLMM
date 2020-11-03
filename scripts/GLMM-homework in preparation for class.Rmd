@@ -35,6 +35,7 @@ output:
     toc: yes
     toc_depth: 4
   fontsize: 10pt
+urlcolor: blue
 ---
 
 ```{r set-options, include=F}
