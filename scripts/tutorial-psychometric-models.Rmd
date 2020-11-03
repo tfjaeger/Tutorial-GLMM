@@ -34,7 +34,8 @@ output:
     number_sections: yes
     toc: yes
     toc_depth: 4
-  fontsize: 10pt
+always_allow_html: true
+urlcolor: blue
 ---
 
 ```{r set-options, include=F}
@@ -66,6 +67,7 @@ library(tidyverse) # gotta be tidy
 library(magrittr)  # pipe!
 library(broom)     # working with model output
 library(brms)      # Bayesian GLMMs and NLMMs
+library(tidybayes) # working with posterior samples of Bayesian models
 
 library(ggthemes)  # cool themes!
 library(scales)    # to plot predictions on original scale of predictor
@@ -79,9 +81,11 @@ options(
   mc.cores = min(chains, parallel::detectCores()))
 ```
 
-# Context
 
-This introduction to psychometric models and their relation to GL(M)Ms uses the same data as the GLMM tutorial. It's best to read it *after* reading the GLMM tutorial.
+# Goals of this tutorial
+This tutorial aims to illustrate the relation between psychometric models (as used in psychophysics) and generalized linear models (GLMs) / generalized linear models (GLMMs). It's best to read it *after* reading the accompanying GL(M)M tutorial within the same git repository. 
+
+Psychometric models aim infer the 'threshold' and 'slope' of a categorization/recognition function along one or more stimulus dimensions (e.g., visual contrast, intensity, size, etc.). One challenge in doing so is that the exact function is unknown, though plausible candidates---such as the Weibull, Gumbel, logistic, cumulative Gaussian, etc.---exist ([quick side-by-side of these functions](http://psignifit.sourceforge.net/PSYCHOMETRICFUNCTIONS.html)). Another challenge is that the estimates of the threshold and slope parameters can be affected (and biased) if attentional lapses are not considered. 
 
 ```{r load data, message=F}
 d = read_csv("../data/data_ClarkCrowding_TrialLevel.csv") 
@@ -111,6 +115,34 @@ d %<>%
 
 str(d)
 ```
+
+
+# Readings and other materials
+
+To learn more about psychometric models, you might also find Gilchrist et al. (2005) and Wichmann and Hill (2001a, b) helpful (both in *Perception & Psychophysics*). Prins (2013, *Journal of Vision*) provides a counterpoint to the solution proposed in Wichmann and Hill (2001). All of these papers are relatively heavy on math. 
+
+Luckily, there is a wealth of information out there, including introductory walk-throughs and powerful animated demonstrations. Here are some walk-through demonstrations (thanks to Martina Poletti, who pointed me to them):
+
+ * \url{http://www.dlinares.org/lapsesquickpsy.html} (partially replicating Wichmann’s point about biases, but also replicating Prins’s failure to replicate Wichmann’s proposed solution)
+ * \url{http://www.palamedestoolbox.org/understandingfitting.html} (beautiful animations and visualizations explaining the fitting process, and the relation between lapse, threshold, and slope; really drives home the point that these three parameters form a joint distribution for which we’re trying to find the set of values that maximize the likelihood of the observed outcomes). Also goes through the Prins and Palamedes papers, and ends with a list of tips.
+ * \url{http://www.palamedestoolbox.org/weibullandfriends.html} (Nice explanation of the psychometric-specific jargon and naming of models; e.g., Gumbel vs. Weibull, a matter of log-transforming the predictor)
+ 
+Some toolboxes/libraries for psychometric models:
+
+ *  Matlab: 
+   * [psignifit/](https://uni-tuebingen.de/en/fakultaeten/mathematisch-naturwissenschaftliche-fakultaet/fachbereiche/informatik/lehrstuehle/neuronale-informationsverarbeitung/research/software/psignifit/)
+ * R: 
+   * [quickpsy](http://dlinares.org/quickpsy.html)
+   * [psyphy](https://cran.r-project.org/web/packages/psyphy/index.html) include GLM-based psychometric model fitting, lapse models, and a variety of psychometric models (incl. cumulative Gaussian)
+   * [modelfree](https://personalpages.manchester.ac.uk/staff/d.h.foster/software-modelfree/latest/home): non-parametric estimation of psychometric functions.
+   * [brms](https://cran.r-project.org/web/packages/brms/vignettes/brms_overview.pdf) can in principle fit outcomes that follow a Bernoulli, Weibull, or Generalized Extreme Value Distribution. This should cover the logistic, Weibull, Gumbel, and Generalized Extreme Value model. It's not yet clear to me whether \texttt{brms} would also be able to fit the cumulative Gaussian model. In any case though, at least the mixture specification is only available if the response part of the model is defined over real numbers (like the lapse part of the model). This is not, for example, the case for the Weibull (and hence Gumbel) model. The main appeal of \texttt{brms} in my view is that it's part of a more general framework of Bayesian model estimation and thus access to the full posterior distribution of all parameters (e.g., via \texttt{tidybayes}). [Summary of distributional families that can be specified in \texttt{brms}](https://cran.r-project.org/web/packages/brms/vignettes/brms_families.html).
+   
+Further readings:
+
+ * Abrahamyan et al. (2016) https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4922170/ (on adaptive procedures)
+ * Jigo & Carrasco (2020) https://jov.arvojournals.org/article.aspx?articleid=2770148 (on exogenous and endogenous attention and their effects on the psychometric function)
+
+
 
 
 # Psychometric functions
@@ -194,7 +226,7 @@ contrasts(d$Condition) = cbind("Crowded.vs.Uncrowded" = c(-.5,.5))
 
 Let's fit this model to the data from Subject 1. 
 
-```{r, message=F, warning=F, error=F}
+```{r, message=F, warning=T, error=F}
 fit.1 <- brm(
   BF,
   data = d %>%
@@ -203,15 +235,15 @@ fit.1 <- brm(
   iter = 8000,
   thin = 5,
   prior = my.priors,
+  file = "../models/subject-lapse-bias"
 )
 
 summary(fit.1)
 plot(fit.1)
-p = plot(marginal_effects(fit.1), 
+p = plot(conditional_effects(fit.1), 
          plot = F,
          points = T, 
          point_args = list(alpha = .05, height = .025, width = .025),
-         line_args = list(fullrange = T),
          theme = theme_fivethirtyeight())[[1]] 
 
 unstandardize = function(x) { x * Size.sd + Size.mu }
@@ -220,19 +252,14 @@ standardize = function(x) { (x - Size.mu) / Size.sd }
 p.common =  
   list(geom_hline(yintercept = .25, color = "black", linetype = 2),
        scale_x_continuous(
-         "Letter size",
-         trans = trans_new(
-           "unstandardize",
-           transform = unstandardize,
-           inverse = standardize)), 
+         "Letter size"), 
        scale_y_continuous(
-         "Probability of correct response",
-         limits = c(0,1)),
+         "Probability of correct response"),
        coord_trans(
          x = trans_new(
            "unstandardize",
-           transform = unstandardize,
-           inverse = standardize)
+           transform = "unstandardize",
+           inverse = "standardize")
        ))
 
 p + p.common
@@ -257,17 +284,19 @@ fit.2 <- brm(
   BF,
   data = d %>%
     filter(Subject == "1"),
-  control = list(adapt_delta = 0.99),
+    control = list(adapt_delta = 0.999),
+  iter = 8000,
+  thin = 5,
   prior = my.priors,
+  file = "../models/subject-lapse-bias-constrained"
 )
 
 summary(fit.2)
 plot(fit.2)
-p = plot(marginal_effects(fit.2), 
+p = plot(conditional_effects(fit.2), 
          plot = F,
          points = T, 
          point_args = list(alpha = .05, height = .025, width = .025),
-         line_args = list(fullrange = T),
          theme = theme_fivethirtyeight())[[1]]
 p + p.common
 ```
@@ -288,28 +317,30 @@ my.priors.lapse <- c(
 )
 ```
 
-```{r, message=F, warning=F, error=F}
+```{r, message=F, warning=T, error=F}
 fit.lapse.1 <- brm(
   BF.lapse,
   data = d %>%
     filter(Subject == "1"),
-  control = list(adapt_delta = 0.99),
+    control = list(adapt_delta = 0.999),
+  iter = 8000,
+  thin = 5,
   prior = my.priors.lapse,
+  file = "../models/subject-lapse-constrained"
 )
 
 summary(fit.lapse.1)
-p = plot(marginal_effects(fit.lapse.1), 
+p = plot(conditional_effects(fit.lapse.1), 
          plot = F,
          points = T, 
          point_args = list(alpha = .05, height = .025, width = .025),
-         line_args = list(fullrange = T),
          theme = theme_fivethirtyeight())[[1]]
 p + p.common
 ```
 
 ## Determining the subject-specific threshold
 
-From a model like that fit in the previous section, we can obtain both naive and lapse-corrected performance thresholds. For lapse-corrected threshold, we need to simple solve the logistic part of the model for the desired threshold. 
+From a model like that fit in the previous section, we can obtain both naive and lapse-corrected performance thresholds. For lapse-corrected threshold, we need to solve the logistic part of the model for the desired threshold. Note that this is an approximate estimate. To get a better estimate, we should marginalize over all posterior samples. This will not necessarily the same as using the (mean) estimates for both the intercept and slope since the posterior distributions of the intercept and slope might be correlated. 
 
 \begin{align}
 logit(threshold) & = & \alpha + \beta * Size 
@@ -319,93 +350,174 @@ For example, for a threshold of .625, we set:
 
 \begin{align}
 logit(.625) & = & \alpha + \beta * Size & \Rightarrow \\
-0.5108256 & = & -6.86 + 5.37 * Size & \Leftrightarrow \\
-1.372593 & = & Size
+0.5108256 & = & 1.04 + 2.00 * Size & \Leftrightarrow \\
+-0.2645872 & = & Size
 \end{align}
 
 ```{r, warning=F}
 p + 
   p.common +
-  geom_segment(x = 1.372593, xend = 1.372593, y = 0, yend = qlogis(.625), color = "red", inherit.aes = F)
+  geom_segment(x = -0.2645872, xend = -0.2645872, y = 0, yend = .625, color = "red", inherit.aes = F)
 ```
 
 ## Combining the data from all subjects
 
-One appeal of approaching psychometric data from the perspective of GLMMs is that we can apply the same random effect approach as in GLMMs for the lapse rate model (which then falls into the class of NLMMs). Note that this is a bit more data (all 6500 or so trials), and the model is more complex, so this will take a moment to complete. On my machine it took about 10 minutes.
+One appeal of approaching psychometric data from the perspective of GLMMs is that we can apply the same random effect approach as in GLMMs for the lapse rate model (which then falls into the class of NLMMs). At this point, I am switching to the mixture formulation of the model as the NLMM formulation didn't converge (2 divergent transitions even with typical priors, thinning, etc.), and the mixture formulation is computationally more effective.
 
-```{r, echo=T}
-BF.lapse.mixed <- brmsformula(
-  ResponseCorrect ~ .25 + (.75-lapse) * inv_logit(eta),
-  eta ~ 1 + Size + (1 + Size | Subject),
-  lapse ~ 1 + (1 | Subject), 
-  family = bernoulli(link="identity"),
-  nl = TRUE
+Now that we're using a bit more data (all 6500 or so trials), the model will take a moment to fit. On my machine it took about 30 minutes. 
+
+```{r}
+my.priors.lapse.mixture <- c(
+  prior(student_t(3, 0, 2.5), class = "b", dpar = mu2),
+  prior(cauchy(0,2.5), class = "sd", dpar = mu2)
 )
+
+fit.lapse.mixed.mixture <- brm(
+  bf(ResponseCorrect ~ 1, 
+     mu1 ~ 0 + offset(qlogis(.25)),
+     mu2 ~ 1 + Size * Condition + (1 + Size * Condition | Subject), 
+     theta1 ~ 1 + (1 | Subject)),
+  data = d, 
+  family = mixture(bernoulli("logit"), bernoulli("logit"), order = "none"),
+  init = 0,
+  control = list(adapt_delta = 0.999),
+  iter = 2000,
+  thin = 1,
+  prior = my.priors.lapse.mixture,
+  file = "../models/subject-lapse-mixed-mixture")
+
+summary(fit.lapse.mixed.mixture)
+hypothesis(fit.lapse.mixed.mixture, "mu2_Size > 0")
+hypothesis(fit.lapse.mixed.mixture, "mu2_ConditionCrowded.vs.Uncrowded < 0")
+hypothesis(fit.lapse.mixed.mixture, "mu2_Size:ConditionCrowded.vs.Uncrowded < 0")
 ```
 
-```{r, message=F, warning=F, error=F}
-my.priors.lapse <- c(
-  prior(student_t(3, 0, 2.5), class = "b", nlpar = "eta"),
-  prior(beta(1, 1), nlpar = "lapse", lb = 0, ub = .5),
-  prior(cauchy(0,2.5), class = "sd", nlpar = "eta"),
-  prior(cauchy(0,2.5), class = "sd", nlpar = "lapse")
-)
+The following plots shows the predictions for each of 100 random posterior samples from each subjects (each curve corresponds to one posterior sample). The solid lines shows the predictions based on the *means* of the posterior samples. This line does not have to fall in the center of the other lines is that the three parameters of the model can be correlated (within and across participants). Taking the mean, rather than marginalizing over the entire posterior distribution, ignores those correlations (but is a *lot* faster to compute and thus used for the present purpose). The parameter summaries at the top left of each graph show those mean parameter values---i.e., those are the parameters of the solid line.
 
-fit.lapse.mixed <- brm(
-  BF.lapse.mixed,
-  data = d,
-  init = 0,
-  iter = 6000,
-  control = list(adapt_delta = 0.999),
-  prior = my.priors.lapse,
-)
-summary(fit.lapse.mixed)
-
-d.fitted = fit.lapse.mixed %>% 
+```{r, fig.width=8, fig.height=16}
+d.fitted = fit.lapse.mixed.mixture %>% 
   spread_draws(
-    b_eta_Intercept,
-    b_eta_Size,
-    b_lapse_Intercept,
-    r_Subject__eta[Subject, coef],
-    r_Subject__lapse[Subject, coef],
-    n = 50) %>%
+    b_theta1_Intercept,
+    b_mu2_Intercept,
+    b_mu2_Size,
+    b_mu2_ConditionCrowded.vs.Uncrowded,
+    `b_mu2_Size:ConditionCrowded.vs.Uncrowded`,
+    r_Subject__mu2[Subject, coef],
+    r_Subject__theta1[Subject, coef2],
+    n = 100) %>%
   pivot_wider(
     names_from = coef,
-    values_from = r_Subject__eta,
+    values_from = r_Subject__mu2,
   ) %>%
   mutate(
-    b_eta_Intercept = b_eta_Intercept + Intercept,
-    b_eta_b_Size = b_eta_b_Size + Size
+    b_mu2_Intercept = b_mu2_Intercept + Intercept,
+    b_mu2_Size = b_mu2_Size + Size,
+    b_mu2_Condition = b_mu2_ConditionCrowded.vs.Uncrowded + Size,
+    b_mu2_SizeCondition = `b_mu2_Size:ConditionCrowded.vs.Uncrowded` + Size,
+    b_theta1_Intercept = b_theta1_Intercept + r_Subject__theta1
   ) %>%
-  select(-c(Intercept, Size))
-
-d.fitted %<>%
+  ungroup() %>%
+  mutate_at("Subject", factor) %>%
   expand(
     nesting(
       .draw, 
-      b_eta_Intercept,
-      b_eta_Size,
-      b_lapse_Intercept),
-    Size = seq(0, 5, .1)
+      Subject,
+      b_mu2_Intercept,
+      b_mu2_Size,
+      b_mu2_Condition,
+      b_mu2_SizeCondition,
+      b_theta1_Intercept),
+    Size = seq(-2.5, 2.5, .1),
+    Condition = c(-.5, .5),
   )
-  ggplot(aes(x = Size, color = Subject, group = .draw)) +
-    geom_line(
-      aes(y = inv_logit_scaled(
-        b_eta_Intercept + b_eta_Size * Size, 
-        lb = .25, 
-        ub = 1 - .25 - b_lapse_Intercept)),
-      alpha = .1) +
-    theme_fivethirtyeight() +
-    p.common
-  
-  
-  
-  mix <- mixture(bernoulli("probit"), bernoulli(“probit”)) 
-fit_mix <- brm(bf(y ~ 1, mu1 ~ x, mu2 ~ 1), data = dat, family = mix)
 
+p = d.fitted %>%
+  ggplot(aes(x = Size, color = Subject, linetype = as.factor(Condition))) +
+  # individual lines
+  geom_line(
+    aes(
+      y = inv_logit_scaled(
+        b_mu2_Intercept + b_mu2_Condition * Condition + b_mu2_Size * Size + b_mu2_SizeCondition * Condition, 
+        lb = .25, 
+        ub = 1 - plogis(b_theta1_Intercept)),
+      group = paste(Subject, Condition, .draw)),
+    alpha = .1) +
+  # by mean (solid) lines
+  geom_line(
+    data = . %>% 
+      group_by(Subject, Size, Condition) %>%
+      summarise(
+        b_mu2_Intercept = mean(b_mu2_Intercept + b_mu2_Condition * Condition),
+        b_mu2_Size = mean(b_mu2_Size + b_mu2_SizeCondition * Condition),
+        b_theta1_Intercept = mean(plogis(b_theta1_Intercept))),
+    aes(
+      y = inv_logit_scaled(
+        b_mu2_Intercept + b_mu2_Size * Size, 
+        lb = .25, 
+        ub = 1 - b_theta1_Intercept),
+      group = paste(Subject, Condition)),
+    size = 1.5) +
+  scale_linetype(
+    "Crowded", 
+    breaks = c(-.5, .5),
+    labels = c("no", "yes")) +
+  theme_fivethirtyeight() +
+  p.common + ylim(0,1)
+
+ggsave(
+  p +
+    facet_grid(Subject ~ .),
+  file = "../figures/lapsing-logistic-GLMM-bySubject.png",
+       width = 8, height = 16)
+
+p +
+  geom_text(
+    data = . %>% 
+      group_by(Subject, Condition) %>%
+      summarise(
+        b_mu2_Intercept = mean(b_mu2_Intercept + b_mu2_Condition * Condition),
+        b_mu2_Size = mean(b_mu2_Size + b_mu2_SizeCondition * Condition),
+        b_theta1_Intercept = mean(plogis(b_theta1_Intercept))),
+    x = -2.5, y = 1,
+    hjust = 0,
+    vjust = 1,
+    size = 3,
+    family = "Courier",
+    fontface = "bold",
+    color = "black",
+    aes(
+      group = paste(Subject, Condition),
+      label = paste0(expression(eta), " = ", round(b_mu2_Intercept, 2), " + ", round(b_mu2_Size, 2), " * Size\n", 
+                     expression(lambda), " = ", round(b_theta1_Intercept, 2)))) +
+  facet_grid(Subject ~ Condition)
+
+ggsave(
+  file = "../figures/lapsing-logistic-GLMM-bySubjectCondition.png",
+  width = 8, height = 16)
 ```
 
+
+We can also visualize the joint posterior distribution of the model's three fixed effect parameters (and could do similarly for each subject). This reveals a correlation between the intercept and slope of the model:
+
+```{r}
+fit.lapse.mixed.mixture %>% 
+  spread_draws(
+    b_mu2_Intercept,
+    b_mu2_Size,
+    b_theta1_Intercept) %>%
+  plotly::plot_ly(
+    x = ~b_mu2_Intercept,
+    y = ~b_mu2_Size,
+    z = ~b_theta1_Intercept,
+    alpha = .3
+  )
+```
+
+
 # Weibull regression
+
+The Weibull model is not a GLM, even if not combined with the lapse rate model. The Weibull has two parameters, the shape parameter $k$ and the scale parameter $\lambda$. Only if the shape parameter is known, is the remaining model a GLM (see \url{https://stats.stackexchange.com/questions/277466/is-weibull-distribution-a-exponential-family}).
+
 
 \begin{figure}
   \centering
@@ -449,33 +561,164 @@ fit_mix <- brm(bf(y ~ 1, mu1 ~ x, mu2 ~ 1), data = dat, family = mix)
   \caption{The Weibull regression is {\em not} a GLM, unless the shape parameter $k$ is fixed (a). The Weibull model with both its scale and shape parameter can thus be seen as an infinite set of GLMs.}
 \end{figure}
 
+```{r, message=F, warning=F, error=F}
+# This does not run since the Weibull is only defined over counts. 
+# It might work if the data is converted into a count representation but I need to understand this better first.
+
+# fit_mix.weibull <- brm(
+#   bf(ResponseCorrect ~ 1, 
+#      mu1 ~ 0 + offset(qlogis(.25)),
+#      mu2 ~ 1 + Size * Condition + (1 + Size * Condition | Subject), 
+#      theta1 ~ 1 + (1 | Subject)),
+#   data = d, 
+#   family = mixture(bernoulli("logit"), weibull("log"), order = "none"),
+#   init = 0,
+#   control = list(adapt_delta = 0.999),
+#   iter = 2000,
+#   thin = 1,
+#   prior = my.priors.lapse.mixture,
+#   file = "../models/subject-lapse-mixed-mixture-weibull")
+```
+
+# Appendix
+
+## NLMM formulation of the lasping mixed-effect logistic model
+
+An example of the NLMM specification of the mixed-effects logistic model, but without crowdedness condition or its interaction with letter size since even this simplified model did not converge. (I first took this approach and then switched to the mixture formulation presented above.)
+
 ```{r, echo=T}
-BF.lapse.mixed.weibull <- brmsformula(
-  ResponseCorrect ~ .25 + (.75-lapse) * inv_logit(eta),
+BF.lapse.mixed <- brmsformula(
+  # reparameterizing the model by fitting lapses in log-odds space (in order to aid convergence)
+  # this means we need to convert the lapses back into proportion space below.
+  ResponseCorrect ~ .25 + (.75-inv_logit(lapse)) * inv_logit(eta),
   eta ~ 1 + Size + (1 + Size | Subject),
   lapse ~ 1 + (1 | Subject), 
-  family = list(bernoulli(link="identity")),
+  family = bernoulli(link="identity"),
   nl = TRUE
 )
 ```
 
-```{r, message=F, warning=F, error=F}
+```{r, message=F, warning=T, error=F}
 my.priors.lapse <- c(
   prior(student_t(3, 0, 2.5), class = "b", nlpar = "eta"),
-  prior(beta(1, 1), nlpar = "lapse", lb = 0, ub = .5),
-  prior(cauchy(0,5), class = "sd", nlpar = "eta"),
-  prior(cauchy(0,5), class = "sd", nlpar = "lapse")
+  prior(student_t(3, 0, 2.5), class = "b", nlpar = "lapse"),
+  prior(cauchy(0,2.5), class = "sd", nlpar = "eta"),
+  prior(cauchy(0,2.5), class = "sd", nlpar = "lapse")
 )
 
-fit.lapse.mixed.weibull <- brm(
+fit.lapse.mixed <- brm(
   BF.lapse.mixed,
   data = d,
   init = 0,
-  iter = 6000,
-  control = list(adapt_delta = 0.99),
+  control = list(adapt_delta = 0.999),
+  iter = 8000,
+  thin = 5,
   prior = my.priors.lapse,
+  file = "../models/subject-lapse-mixed-logit"
 )
+
+summary(fit.lapse.mixed)
 ```
+
+The following plots shows the predictions for each of 100 random posterior samples from each subjects (each curve corresponds to one posterior sample). The solid lines shows the predictions based on the *means* of the posterior samples. The reason this line does not always fall in the center of the other lines is that the three parameters of the model can be correlated (within and across participants). Taking the mean, rather than marginalizing over the entire posterior distribution, ignores those correlations (but is a *lot* faster to compute and thus used for the present purpose). The parameter summaries at the top left of each graph show those mean parameter values---i.e., those are the parameters of the solid line.
+
+
+```{r, fig.width=8, fig.height=16}
+d.fitted = fit.lapse.mixed %>% 
+  spread_draws(
+    b_eta_Intercept,
+    b_eta_Size,
+    b_lapse_Intercept,
+    r_Subject__eta[Subject, coef],
+    r_Subject__lapse[Subject, coef2],
+    n = 100) %>%
+  pivot_wider(
+    names_from = coef,
+    values_from = r_Subject__eta,
+  ) %>%
+  mutate(
+    b_eta_Intercept = b_eta_Intercept + Intercept,
+    b_eta_Size = b_eta_Size + Size,
+    b_lapse_Intercept = b_lapse_Intercept + r_Subject__lapse
+  ) %>%
+  ungroup() %>%
+  mutate_at("Subject", factor) %>%
+  expand(
+    nesting(
+      .draw, 
+      Subject,
+      b_eta_Intercept,
+      b_eta_Size,
+      b_lapse_Intercept),
+    Size = seq(-2.5, 2.5, .1)
+  )
+
+d.fitted %>%
+  ggplot(aes(x = Size, color = Subject)) +
+  geom_line(
+    aes(
+      y = inv_logit_scaled(
+        b_eta_Intercept + b_eta_Size * Size, 
+        lb = .25, 
+        ub = 1 - plogis(b_lapse_Intercept)),
+      group = paste(Subject, .draw)),
+    alpha = .1) +
+  geom_line(
+    data = . %>% 
+      group_by(Subject, Size) %>%
+      summarise(
+        b_eta_Intercept = mean(b_eta_Intercept),
+        b_eta_Size = mean(b_eta_Size),
+        b_lapse_Intercept = mean(plogis(b_lapse_Intercept))),
+    aes(
+      y = inv_logit_scaled(
+        b_eta_Intercept + b_eta_Size * Size, 
+        lb = .25, 
+        ub = 1 - b_lapse_Intercept),
+      group = Subject),
+    size = 1) +
+  geom_text(
+    data = . %>% 
+      group_by(Subject) %>%
+      summarise(
+        b_eta_Intercept = mean(b_eta_Intercept),
+        b_eta_Size = mean(b_eta_Size),
+        b_lapse_Intercept = mean(plogis(b_lapse_Intercept))),
+    x = -2.5, y = 1,
+    hjust = 0,
+    vjust = 1,
+    size = 3,
+    family = "Courier",
+    fontface = "bold",
+    color = "black",
+    aes(
+      group = Subject,
+      label = paste0(expression(eta), " = ", round(b_eta_Intercept, 2), " + ", round(b_eta_Size, 2), " * Size\n", 
+                     expression(lambda), " = ", round(b_lapse_Intercept, 2)))) +
+  facet_wrap(~ Subject, nrow = 4) +
+  theme_fivethirtyeight() +
+  p.common + ylim(0,1)
+
+# PS: a neat post on how to combine math expressions, variable values, and normal text in R:
+# https://trinkerrstuff.wordpress.com/2018/03/15/2246/
+```
+
+And the joint posterior distribution of the model's three fixed effect parameters (and could do similarly for each subject). This reveals a correlation between the intercept and slope of the model:
+
+```{r}
+fit.lapse.mixed %>% 
+  spread_draws(
+    b_eta_Intercept,
+    b_eta_Size,
+    b_lapse_Intercept) %>%
+  plotly::plot_ly(
+    x = ~b_eta_Intercept,
+    y = ~b_eta_Size,
+    z = ~b_lapse_Intercept,
+    alpha = .5
+  )
+```
+
 
 # Session info
 ```{r session_info, include=TRUE, echo=TRUE, results='markup'}
