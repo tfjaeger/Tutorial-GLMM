@@ -98,21 +98,24 @@ d %<>%
     Condition = Crowded,
     Threshold.Subj = Threshold,
     DiffusionConstant.Subj = DiffusionConstant,
+    Curvature.Subj = Curvature,
     Span.Subj = Span,
     Area.Subj = Area,
-    Curvature.Subj = Curvature,
     Speed.Subj = Speed,
     Size = Size,
     Size.AvgPerformance = Performance,
     ResponseExpected = Answer,
     ResponseCorrect = Correct,
     Curvature = TrialCurvature,
+    DiffusionConstant = individualDiffusionConstant,
     Speed = TrialSpeed,
-    Span = TrialSpan
-    ) %>%
+    Span = TrialSpan) %>%
   mutate(Condition = factor(ifelse(Condition == 0, "uncrowded", "crowded"), 
                             levels = c("uncrowded", "crowded"))) %>%
-  select(Subject, Condition, Threshold.Subj, DiffusionConstant.Subj, Area.Subj, Span.Subj, Speed.Subj, everything(), Span, Speed, Curvature) %>%
+  select(Subject, Condition, 
+         Threshold.Subj, DiffusionConstant.Subj, Area.Subj, Span.Subj, Speed.Subj, 
+         everything(), 
+         DiffusionConstant, Curvature, Span, Speed) %>%
   mutate_at(c("Subject"), factor)
 
 str(d)
@@ -158,48 +161,63 @@ To compare H1 and H2, we need to fit and compare a few models:
  
 **For GL*M*Ms, it is important to keep in mind that we're interested in assessing the role of the *fixed* effects. We therefore use the *same random effect structure across all of the three models*.** If we didn't, whatever differences we find in the models' fit might be driven by differences in their random effects, and we want to avoid that. Specifically, this means that we're using the full random effect structure that includes random slopes for both condition and eye-movements in all of the three models.
 
-Here, we use *curvature* as a measure of the relevant eye-movement. The fixed effects of the three resulting models are summarized below. Note that the combined model (model 3) indeed contains a superset of the predictors of the two nested models:
+Here, we use the *diffusion constant* as a measure of the relevant eye-movement. The fixed effects of the three resulting models are summarized below. Note that the combined model (model 3) indeed contains a superset of the predictors of the two nested models:
 
 ```{r}
 center = function(x) { return(x - mean(x)) }
 
 # the three models only differ in their formula. They are fit against the same data using the same method.
-m.condition = glmer(
-  ResponseCorrect ~ 1 + center(Size) * Condition + 
-    (1 + center(Size) * (Condition + center(Curvature)) | Subject),
-  data = d,
-  control = glmerControl(
-    optimizer = c("bobyqa"),
-    optCtrl = list(
-      npt = 10,
-      maxfun = 2e6)),
-  family = binomial)
+if (file.exists("../models/GLMM-for-model-comparison-without-diffusion-constant.rds")) {
+  m.condition =  readRDS("../models/GLMM-for-model-comparison-without-diffusion-constant.rds")
+} else {
+  m.condition = glmer(
+    ResponseCorrect ~ 1 + center(Size) * Condition + 
+      (1 + center(Size) * (Condition + center(DiffusionConstant)) | Subject),
+    data = d,
+    control = glmerControl(
+      optimizer = c("bobyqa"),
+      optCtrl = list(
+        npt = 10,
+        maxfun = 2e6)),
+    family = binomial)
+  saveRDS(m.condition, file = "../models/GLMM-for-model-comparison-without-diffusion-constant.rds")
+}
 
-m.curvature = glmer(
-  ResponseCorrect ~ 1 + center(Size) * center(Curvature) + 
-    (1 +  center(Size) * (Condition + center(Curvature)) | Subject),
-  data = d,
-  control = glmerControl(
-    optimizer = c("bobyqa"),
-    optCtrl = list(
-      npt = 10,
-      maxfun = 2e6)),
-  family = binomial)
+if (file.exists("../models/GLMM-for-model-comparison-without-condition.rds")) {
+  m.DiffusionConstant = readRDS("../models/GLMM-for-model-comparison-without-condition.rds")
+} else {
+  m.DiffusionConstant = glmer(
+    ResponseCorrect ~ 1 + center(Size) * center(DiffusionConstant) + 
+      (1 +  center(Size) * (Condition + center(DiffusionConstant)) | Subject),
+    data = d,
+    control = glmerControl(
+      optimizer = c("bobyqa"),
+      optCtrl = list(
+        npt = 10,
+        maxfun = 2e6)),
+    family = binomial)
+  saveRDS(m.DiffusionConstant, file = "../models/GLMM-for-model-comparison-without-condition.rds")
+}
 
-m.both = glmer(
-  ResponseCorrect ~ 1 + center(Size) * (Condition + center(Curvature)) + 
-    (1 +  center(Size) * (Condition + center(Curvature)) | Subject),
-  data = d,
-  control = glmerControl(
-    optimizer = c("bobyqa"),
-    optCtrl = list(
-      npt = 10,
-      maxfun = 2e6)),
-  family = binomial)
+if (file.exists("../models/GLMM-for-model-comparison-both.rds")) {
+  m.both = readRDS("../models/GLMM-for-model-comparison-both.rds")
+} else {
+  m.both = glmer(
+    ResponseCorrect ~ 1 + center(Size) * (Condition + center(DiffusionConstant)) + 
+      (1 +  center(Size) * (Condition + center(DiffusionConstant)) | Subject),
+    data = d,
+    control = glmerControl(
+      optimizer = c("bobyqa"),
+      optCtrl = list(
+        npt = 10,
+        maxfun = 2e6)),
+    family = binomial)
+  saveRDS(m.both, file = "../models/GLMM-for-model-comparison-both.rds")
+}
 
 # Only printing the fixed effects
 tidy(m.condition) %>% filter(effect == "fixed") %>% select(-c(effect, group))
-tidy(m.curvature) %>% filter(effect == "fixed") %>% select(-c(effect, group))
+tidy(m.DiffusionConstant) %>% filter(effect == "fixed") %>% select(-c(effect, group))
 tidy(m.both) %>% filter(effect == "fixed") %>% select(-c(effect, group))
 ```
  
@@ -214,7 +232,7 @@ Both of the model comparisons (model 3 against model 1, and model 3 against mode
 
 But we don't want to just say that models with less error are automatically *significantly* better. To determine whether a change in the deviance is significant, we compare it against the change in the complexity of the model. We measure this additional complexity as the increase in the number of degrees of freedom from the nested to the nesting model. Let's call this difference in the number parameters in the model $\delta_k$. In the limit, the difference in deviance between the two models approximates a $\chi^2$-distribution with $\delta_k$ degrees of freedom. That is, if we have sufficiently much data we can assess whether a model fit has improved significantly by asking whether $\chi^2(\delta_k) = \delta_{deviance} is significant. 
 
-In R and Matlab, the anova functions allow us to directly compare nested LMs, GLMs, or GLMMs. For example, for the comparison of the nesting model (model 3) against the model without curvature (model 1):
+In R and Matlab, the anova functions allow us to directly compare nested LMs, GLMs, or GLMMs. For example, for the comparison of the nesting model (model 3) against the model without DiffusionConstant (model 1):
 
 ```{r, echo=T}
 anova(m.both, m.condition, test = "chisq")
@@ -223,12 +241,13 @@ anova(m.both, m.condition, test = "chisq")
 And for the comparison of the nesting model (model 3) against the model without condition (model 2):
 
 ```{r, echo=T}
-anova(m.both, m.curvature, test = "chisq")
+anova(m.both, m.DiffusionConstant, test = "chisq")
 ```
 
 ### Discuss in class
 
- 1. In your own words, what would you conclude from this analysis?
+ 1. In your own words, what would you conclude from this mediation analysis?
+ 1. Looking back at the model without condition (model 2), notice how the effect of number size is reduced compared to the model without the diffusion constant (model 1). What do you make out of that? 
 
 ### Further readings on model comparison
 
