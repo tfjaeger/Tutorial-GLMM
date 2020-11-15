@@ -1,0 +1,243 @@
+---
+title: "Addendum: Modeling nonlinear effects of predictors"
+subtitle: "(Bayesian GLMMs and GAMMs)"
+author: "T. Florian Jaeger"
+date: \today
+geometry: margin=2cm
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{siunitx}
+  - \usepackage{tabto}
+  - \usepackage{soul}
+  - \usepackage{xcolor}
+  - \usepackage{placeins}
+  - \usepackage{lscape}
+  - \newcommand{\blandscape}{\begin{landscape}}
+  - \newcommand{\elandscape}{\end{landscape}}
+  - \makeatletter\renewcommand{\fps@table}{!ht}\makeatother
+  - \setstcolor{red}
+  - \usepackage{sectsty}
+  - \sectionfont{\color{blue}} 
+  - \subsectionfont{\color{blue}}
+  - \subsubsectionfont{\color{darkgray}}
+  - \usepackage{caption}
+  - \usepackage{subcaption}
+  - \usepackage{tikz}
+  - \usepackage{url}
+  - \usetikzlibrary{bayesnet}
+output:
+  pdf_document: 
+    fig_caption: yes
+    fig_width: 7
+    keep_tex: yes
+    latex_engine: xelatex
+    number_sections: yes
+    toc: yes
+    toc_depth: 4
+  fontsize: 10pt
+---
+
+```{r set-options, include=F}
+library(knitr)
+opts_chunk$set(dev = 'pdf',
+               comment="", 
+               echo=FALSE, warning=TRUE, message=TRUE,
+               cache=TRUE, 
+               size="footnotesize",
+               tidy.opts = list(width.cutoff = 260),
+               fig.width = 8, fig.height = 4.5, fig.align = "center")
+
+def.chunk.hook  <- knitr::knit_hooks$get("chunk")
+knitr::knit_hooks$set(chunk = function(x, options) {
+  x <- def.chunk.hook(x, options)
+  ifelse(options$size != "normalsize", paste0("\n \\", options$size,"\n\n", x, "\n\n \\normalsize"), x)
+})
+
+color_block = function(color) {
+  function(x, options) sprintf('\\color{%s}\\begin{verbatim}%s\\end{verbatim}\\color{black}',
+                               color, x)
+}
+knitr::knit_hooks$set(error = color_block('red'))
+knitr::knit_hooks$set(warning = color_block('orange'))
+```
+
+```{r libraries, include=FALSE}
+library(tidyverse) # gotta be tidy
+library(magrittr)  # pipe!
+
+library(brms)      # bayesian GLMMs
+library(ggthemes)  # nice themes
+```
+
+```{r constants, include=F}
+chains = 4
+
+options(
+  width = 1000,
+  mc.cores = min(chains, parallel::detectCores()))
+
+theme_set(theme_wsj())
+```
+
+
+
+# Overview
+
+This document builds on the GLMM homework and in-class material to use the same data set to model nonlinear effects of predictors. For convenience, I use the Bayesian GLMM developed at the end of the in-class GLMM materials as a starting point. As a reminder, this GLMM modeled the trial-level effects of the crowdedness condition, stimulus size and their interaction on the accuracy participants' responses. Here I am visualizing the models predictions both in proportion space (left) and log-odds (right):
+
+```{r load data, include=F}
+d = read_csv("../data/data_ClarkCrowding_TrialLevel.csv") 
+d %<>%
+  droplevels() %>%
+  rename(
+    Condition = Crowded,
+    Threshold.Subj = Threshold,
+    DiffusionConstant.Subj = DiffusionConstant,
+    Curvature.Subj = Curvature,
+    Span.Subj = Span,
+    Area.Subj = Area,
+    Speed.Subj = Speed,
+    Size = Size,
+    Size.AvgPerformance = Performance,
+    ResponseExpected = Answer,
+    ResponseCorrect = Correct,
+    Curvature = TrialCurvature,
+    DiffusionConstant = individualDiffusionConstant,
+    Speed = TrialSpeed,
+    Span = TrialSpan) %>%
+  mutate(Condition = factor(ifelse(Condition == 0, "uncrowded", "crowded"), 
+                            levels = c("uncrowded", "crowded"))) %>%
+  select(Subject, Condition, 
+         Threshold.Subj, DiffusionConstant.Subj, Area.Subj, Span.Subj, Speed.Subj, 
+         everything(), 
+         DiffusionConstant, Curvature, Span, Speed) %>%
+  mutate_at(c("Subject"), factor)
+```
+
+```{r, echo=T, fig.height=3, fig.width=4, fig.show="hold", out.width="45%"}
+my.priors <- c(
+  prior(student_t(3, 0, 2.5), class = "b"),
+  prior(cauchy(0,2.5), class = "sd"),
+  prior(lkj(1), class = "cor")
+)
+
+Size.mu = mean(d$Size)
+Size.sd = sd(d$Size)
+
+# Standardize Size and make sure order of levels for Condition is as intended
+d %<>%
+    mutate(
+      Condition = factor(Condition, levels = c("uncrowded", "crowded")),
+      Size = (Size - mean(Size)) / (2 * sd(Size)))
+
+# Sum-code condition
+contrasts(d$Condition) = cbind("Crowded.vs.Uncrowded" = c(-.5,.5))
+
+bm <- brm(
+  formula = ResponseCorrect ~ 1 + Size * Condition + 
+    (1 + Size * Condition | Subject),
+  data = d,
+  family = bernoulli("logit"),
+  iter = 2000,
+  prior = my.priors,
+  file = "../models/GLMM"
+)
+
+summary(bm)
+plot(conditional_effects(bm, effects = "Size:Condition", method = "posterior_epred"), ask = F)
+plot(conditional_effects(bm, effects = "Size:Condition", method = "posterior_linpred"), ask = F)
+```
+
+
+# Is there a *linear* effect of eye-movements on the probability of a correct answer?
+
+We test whether the amount of eye-movements during a trial---operationalized as the diffusion constant---has an effect on the probability of a correct answer. For the purpose of this example, we intentionally do not assess whether there are outliers, despite the fact that the diffusion constant is known to be a very noisy measure at the trial level (previous analyses only assessed its effect at the subject-level, i.e., effects of the average diffusion constant across all trials of a subject in a given condition). We begin with a model that assumes a linear effect of diffusion constant (on the log-odds of a correct answer) in addition to the effects of crowdedness condition, stimulus size, and their interaction. To put the diffusion constant on the same scale as the other predictors---so that the priors on all coefficients have the same weakly regularizing effect---we center and standarize the diffusion constant following the same procedure as applied to stimulus size in the in-class part of the GLMM tutorial. We visualize the effect of the diffusion constant on the proportion (left) and log-odds (right) of a correct answer: 
+
+```{r, echo=T, fig.height=3, fig.width=4, fig.show="hold", out.width="45%"}
+DiffusionConstant.mu = mean(d$DiffusionConstant)
+DiffusionConstant.sd = sd(d$DiffusionConstant)
+
+d %<>%
+    mutate(
+      DiffusionConstant = (DiffusionConstant - mean(DiffusionConstant)) / (2 * sd(DiffusionConstant)))
+
+bm.wDiffusionConstant <- brm(
+  formula = ResponseCorrect ~ 1 + Size * Condition + DiffusionConstant +
+    (1 + Size * Condition | Subject),
+  data = d,
+  family = bernoulli("logit"),
+  iter = 2000,
+  prior = my.priors,
+  file = "../models/GLMM-with-DiffusionConstant"
+)
+
+summary(bm.wDiffusionConstant)
+plot(
+  conditional_effects(bm.wDiffusionConstant, effects = "DiffusionConstant", method = "posterior_epred"), 
+  ask = F, rug = T)
+plot(
+  conditional_effects(bm.wDiffusionConstant, effects = "DiffusionConstant", method = "posterior_linpred"), 
+  ask = F, rug = T)
+```
+One issue to expect from the plots shown above is the sparsity of data for high values of the diffusion constant, as evidenced in the data rug along the x-axis. Extreme values like this can be overly influential on the model fit, and this risk increases as we increase the functional flexibility of the effect of the diffusion constant in the next section (in order to entertain nonlinear effects).
+
+# Is there a *nonlinear* effect of eye-movements on the probability of a correct answer?
+
+Next we entertain three ways of detecting non-linear effects of the diffusion constant. It should be noted though that a purely exploratory approach like this inflates the number of tests we conduct and thus the family-wise Type I error rate. In particular, since we are entertaining nonlinear effects a blind exploration of possible fits risks overfitting the model to the data. It is thus highly advisable to take a theory-driven approach, where the theory constraints the functional shape of the nonlinear effect. Whenever an exploratory approach is taken, it should be clearly indicated along with the consequences (risk of overfitting and inflated Type I error rate).
+
+## Polynomials
+
+One approach to modeling nonlinear effect are polynomials. Here we use R's \texttt{poly} function to obtain *orthogonal* polynomials of the third order. We again visualize the effect of the diffusion constant on the proportion (left) and log-odds (right) of a correct answer. Based on both the model output and the plots, there is little evidence of nonlinearities in the effect of the diffusion constant, and no evidence of any non-zero effect of diffusion constant. The model output, for example, shows that the 95% credible intervals of all three components of the polynomial---including the linear component---include zero:
+
+```{r, echo=T, fig.height=3, fig.width=4, fig.show="hold", out.width="45%"}
+bm.wDiffusionConstant.poly <- brm(
+  formula = ResponseCorrect ~ 1 + Size * Condition + poly(DiffusionConstant,3) +
+    (1 + Size * Condition | Subject),
+  data = d,
+  family = bernoulli("logit"),
+  iter = 2000,
+  prior = my.priors,
+  file = "../models/GLMM-with-DiffusionConstant-poly",
+  control = list(adapt_delta = .95)
+)
+
+summary(bm.wDiffusionConstant.poly)
+plot(
+  conditional_effects(bm.wDiffusionConstant.poly, effects = "DiffusionConstant", method = "posterior_epred"), 
+  ask = F, rug = T)
+plot(
+  conditional_effects(bm.wDiffusionConstant.poly, effects = "DiffusionConstant", method = "posterior_linpred"), 
+  ask = F, rug = T)
+```
+
+
+## Non-parametric smooths in a GAMM 
+
+Alternatively, we can use \texttt{brms}'s ability to fit generalized additive mixed models (GAMMs) and model the effect of the diffusion constant as a non-parametric smooth. If this method is applied in an actual research project, it is important to read up on the many different options you can select from when fitting such smooths, their consequences, and potential risks. We again visualize the effect of the diffusion constant on the proportion (left) and log-odds (right) of a correct answer. Based on this output, too, we see no evidence of linear or non-linear effects of the diffusion constant. 
+
+```{r, echo=T, fig.height=3, fig.width=4, fig.show="hold", out.width="45%"}
+bm.wDiffusionConstant.smooth <- brm(
+  formula = ResponseCorrect ~ 1 + Size * Condition + s(DiffusionConstant) +
+    (1 + Size * Condition | Subject),
+  data = d,
+  family = bernoulli("logit"),
+  iter = 2000,
+  prior = my.priors,
+  file = "../models/GLMM-with-DiffusionConstant-smooth",
+  control = list(adapt_delta = .95)
+)
+
+summary(bm.wDiffusionConstant.smooth)
+plot(
+  conditional_effects(bm.wDiffusionConstant.smooth, effects = "DiffusionConstant", method = "posterior_epred"), 
+  ask = F, rug = T)
+plot(
+  conditional_effects(bm.wDiffusionConstant.smooth, effects = "DiffusionConstant", method = "posterior_linpred"), 
+  ask = F, rug = T)
+```
+Notice further how this non-parametric smooth avoids the perhaps misleading impression that one might get from the polynomial in the previous section: the indication of a non-linear effect for large values of diffusion constant. Polynomial fits are well-known to be overly sensitive to data points with extreme values for the predictor, where the data is often sparse. This is one way in which polynomials are likely to overfit the data, yielding bad predictions in particular for novel data with predictor values that fall outside of the range observed in the sample the model was fit to. 
+
+# Session info
+```{r session_info, include=TRUE, echo=TRUE, results='markup'}
+devtools::session_info()
+```
