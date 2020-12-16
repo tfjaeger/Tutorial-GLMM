@@ -1151,21 +1151,13 @@ ggsave(
   width = 8, height = 20)
 ```
 
+We can use animation to further illustrate the hierarchical nature of the model. Note how the different posterior samples (each animation step) 'move in sync'. That is because the subject-specific predictions include the population-level predictions that are common to all subjects:
+
+
 ```{r, fig.width=8, fig.height=16, message=FALSE, fig.show='animate', animation.hook='gifski', interval=1/10}
 plot_psychometric(model = fit.lapse.mixed.mixture, animate = T) 
 ```
 
-Zooming in on Subject 1-4:
-
-```{r mixture-GLMM-results-plots-subject1-to-4, message=FALSE, fig.show='animate', animation.hook='gifski', interval=1/10, fig.width=8, fig.height=7.5}
-p <- plot_psychometric(model = fit.lapse.mixed.mixture, 1:4) + 
-    transition_states(.draw, transition_length = 1, state_length = 1, wrap = T)
-p
-# animate(plot = p, 
-#         renderer = gifski_renderer(
-#           file = "../figures/lapsing-logistic-GLMM-bySubject124Condition.gif", 
-#           width = 700, height = 1500))
-```
 
 <!-- ## Same model but holding lapse rate constant -->
 
