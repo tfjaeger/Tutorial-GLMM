@@ -10,7 +10,6 @@ header-includes:
   - \usepackage{tabto}
   - \usepackage{soul}
   - \usepackage{xcolor}
-  - \usepackage{animate}
   - \usepackage{placeins}
   - \usepackage{lscape}
   - \newcommand{\blandscape}{\begin{landscape}}
@@ -26,8 +25,10 @@ header-includes:
   - \usepackage{tikz}
   - \usepackage{url}
   - \usetikzlibrary{bayesnet}
+  - \usepackage{animate}
 output:
   pdf_document: 
+    extra_dependencies: animate
     fig_caption: yes
     fig_width: 7
     keep_tex: yes
@@ -41,12 +42,12 @@ urlcolor: blue
 
 ```{r set-options, include=F}
 library(knitr)
-opts_chunk$set(dev = 'pdf',
+opts_chunk$set(
                comment="", 
                echo=FALSE, warning=TRUE, message=TRUE,
-               cache=FALSE, 
+               cache=TRUE, 
                size="footnotesize",
-               tidy.opts = list(width.cutoff = 250),
+               tidy.opts = list(width.cutoff = 110),
                fig.width = 8, fig.height = 4.5, fig.align = "center")
 
 def.chunk.hook  <- knitr::knit_hooks$get("chunk")
@@ -74,17 +75,28 @@ library(tidybayes)    # working with posterior samples of Bayesian models
 library(ggthemes)  # cool themes!
 library(scales)    # to plot predictions on original scale of predictor
 library(gganimate) # animations
+library(gifski)
 library(plotly)    # 3D interactive plots
 ```
 
 ```{r constants, include=F}
 chains = 4
-
 options(
-  width = 1000,
+  width = 110,
   mc.cores = min(chains, parallel::detectCores()))
 ```
 
+```{r functions, include=F}
+my_hypotheses = function(model, prefix= "eta") {
+  rbind(
+    hypothesis(model, paste0(prefix, "_Size > 0"))$hypothesis, 
+    hypothesis(model, paste0(prefix, "_ConditionCrowded.vs.Uncrowded > 0"))$hypothesis,
+    hypothesis(model, paste0(prefix, "_Size:ConditionCrowded.vs.Uncrowded > 0"))$hypothesis) %>%
+    kable()
+}
+
+my_hypotheses_mixture = function(model) my_hypotheses(model, prefix = "mu2")
+```
 
 # Goals of this tutorial
 This tutorial aims to illustrate the relation between psychometric models (as used in psychophysics) and generalized linear models (GLMs) / generalized linear models (GLMMs). It's best to read it *after* reading the accompanying GL(M)M tutorial within the same git repository. 
@@ -279,6 +291,23 @@ p = plot(conditional_effects(fit.lapse.1),
          points = T, 
          point_args = list(alpha = .05, height = .025, width = .025),
          theme = theme_fivethirtyeight())[[1]]
+
+# Some common plot components to be reused below
+unstandardize = function(x) { x * Size.sd + Size.mu }
+standardize = function(x) { (x - Size.mu) / Size.sd }
+
+p.common =  
+  list(geom_hline(yintercept = .25, color = "black", linetype = 2),
+       scale_x_continuous(
+         "Letter size"), 
+       scale_y_continuous(
+         "Probability of correct response"),
+       coord_trans(
+         x = trans_new(
+           "unstandardize",
+           transform = "unstandardize",
+           inverse = "standardize")
+       ))
 p + p.common
 ```
 
@@ -316,7 +345,7 @@ This section first present a simulation study (for which the ground truth is kno
 
 We first make a data generator for a 2AFC task that creates data following the Wiechman and Hill (2001) model with a logistic response function:
 
-```{r generate-data-generator, echo=T}
+```{r simulation-generate-data-generator, echo=T}
 gelman_scale = function(x) {
   x = (x - mean(x)) / (2 * sd(x))
 }
@@ -355,7 +384,7 @@ d.temp = generate_data(
   n_per_stimulus = 100) 
 ```
 
-```{r define-analyses, echo=T}
+```{r simulation-define-analyses, include=T}
 par.n_choices = 2
 par.lambda = c(0, .025, .05, .1)
 par.gamma = 1 / par.n_choices
@@ -376,7 +405,7 @@ for (i in 1:length(par.lambda)) {
         nl = TRUE),
       data = d.temp,
       chains = 0,
-      prior = my.priors,?
+      prior = my.priors,
       file = paste0("../models/sim-model-gamma", par.gamma[j], "-lapse", par.lambda[i]))
   }
 }
@@ -384,7 +413,7 @@ for (i in 1:length(par.lambda)) {
 
 Here is an example draw from the data generator with 100 data points per stimulus at five different stimulus locations between 0 and 3 for $\lambda = .05$. The first plot shows a fit if the lapse rate is assumed to be zero. The next plot adds the ground truth functional relation, including the lapse rate. The third plot shows the resulting bias in the intercept and slope of the perceptual model when the $\lambda$ is assumed to be 0 (blue) compared to the groundtruth of $\lambda = .05$ (gray).
 
-```{r plots}
+```{r simulation-example-data-plots, warning=FALSE}
 # without lapse
 d.temp %>%
   ggplot(aes(x = stimulus, y = accuracy)) +
@@ -472,7 +501,8 @@ tibble(stimulus = seq(0, 3, length.out = 100)) %>%
   theme_bw()
 ggsave(file = "../figures/simulation-example-psychometric-fit-just-responses-based-on-stimulus.png", width = 5, height = 3.5)
 ```
-For our simulation, we obtain 100 simulated data sets for each of a variety of combinations of values for the true intercept, slope, and lambda (gamma is always .5 since we're simulated a 2AFC task). e will consider four different analyses, each assuming a different fixed lapse rate (0, .025, .05, .1). 
+
+For the simulation, we obtain 100 simulated data sets for each of a variety of combinations of values for the true intercept, slope, and lambda (gamma is always .5 since we're simulated a 2AFC task). e will consider four different analyses, each assuming a different fixed lapse rate (0, .025, .05, .1). 
 
 ```{r simulation-loop} 
 if (file.exists("../models/simulation.RData")) {
@@ -551,7 +581,7 @@ if (file.exists("../models/simulation.RData")) {
 
 The following plots illustrate the correlation among the intercept and slope in the different simulation conditions.
 
-```{r plot-simulation-results-correlations}
+```{r simulation-results-plots-correlations}
 p = d.sim %>%
   filter(true.intercept == -4, true.slope == 3) %>%
   pivot_wider(
@@ -601,7 +631,7 @@ ggsave("../figures/simulation-correlation-intercept-slope.png", height = 8, widt
 
 In the following plots, the gray dashed lines indicate the ground truth. We are summarizing the distribution of estimates for the intercept and slope obtained for the different types of simulation runs (each with 100 simulation samples).
 
-```{r plotting-simulation-results}
+```{r plotting-simulation-plots-results}
 d.sim %>%
   group_by(model.lambda, model.gamma, n_per_stimulus, stimuli) %>%
   ggplot(aes(x = model.lambda, y = Estimate, color = stimuli)) +
@@ -636,14 +666,7 @@ We fit a series of model to the data from Subject 3 from Ashley data. For all mo
 
 The first model assumes $\lambda = 0$ (no lapses):
 
-```{r, echo=T}
-my_hypotheses = function(model) {
-  print(hypothesis(model, "eta_Size > 0"))
-  print(hypothesis(model, "eta_ConditionCrowded.vs.Uncrowded > 0"))
-  print(hypothesis(model, "eta_Size:ConditionCrowded.vs.Uncrowded > 0"))
-}
-
-
+```{r subject3-lapse0, echo=T}
 BF <- brmsformula(
   ResponseCorrect ~ .25 + (1-.25-0) * inv_logit(eta),
   eta ~ 1 + Size * Condition,
@@ -680,7 +703,7 @@ p + p.common
 
 The next two models assume non-zero lapse rates of $\lambda = .05$ and $\lambda = .2$, respectively:
 
-```{r}
+```{r subject3-lapse05}
 BF <- brmsformula(
   ResponseCorrect ~ .25 + (1-.25-0.05) * inv_logit(eta),
   eta ~ 1 + Size * Condition,
@@ -713,7 +736,7 @@ p + p.common
 
 
 
-```{r}
+```{r subject3-lapse2}
 BF <- brmsformula(
   ResponseCorrect ~ .25 + (1-.25-0.2) * inv_logit(eta),
   eta ~ 1 + Size * Condition,
@@ -748,7 +771,7 @@ p + p.common
 
 We infer the lapse rate from the data while assuming it's constant across conditions:
 
-```{r, echo=T}
+```{r subject3-lapse-inferred, echo=T}
 BF <- brmsformula(
   ResponseCorrect ~ .25 + (1-.25-lapse) * inv_logit(eta),
   eta ~ 1 + Size * Condition,
@@ -879,7 +902,7 @@ The examples shown above assume that $\gamma$ is known. That is commonly the cas
 
 When inferring both $\gamma$ and $\lambda$ is substantially more efficient (and often necessary) to switch to the mixture formulation of the mode, as it allows us to orthogonalize $\gamma$ and $\lambda$:
 
-```{r}
+```{r mixture-GLMM}
 my.priors.lapse.mixture <- c(
   prior(student_t(3, 0, 2.5), class = "b", dpar = mu2),
   prior(cauchy(0,2.5), class = "sd", dpar = mu2)
@@ -921,16 +944,12 @@ fit.lapse.mixed.mixture <- brm(
   prior = my.priors.lapse.mixture,
   file = "../models/subject-lapse-mixed-mixture-gamma-lambda")
 
-
-summary(fit.lapse.mixed.mixture)
-hypothesis(fit.lapse.mixed.mixture, "mu2_Size > 0")
-hypothesis(fit.lapse.mixed.mixture, "mu2_ConditionCrowded.vs.Uncrowded < 0")
-hypothesis(fit.lapse.mixed.mixture, "mu2_Size:ConditionCrowded.vs.Uncrowded < 0")
+my_hypotheses_mixture(fit.lapse.mixed.mixture)
 ```
 
 The following plots shows the predictions for each of 100 random posterior samples from each subjects (each curve corresponds to one posterior sample). The solid lines shows the predictions based on the *means* of the posterior samples. This line does not have to fall in the center of the other lines is that the three parameters of the model can be correlated (within and across participants). Taking the mean, rather than marginalizing over the entire posterior distribution, ignores those correlations (but is a *lot* faster to compute and thus used for the present purpose). The parameter summaries at the top left of each graph show those mean parameter values---i.e., those are the parameters of the solid line.
 
-```{r, fig.width=8, fig.height=16}
+```{r mixture-GLMM-functions}
 get_gamma = function(theta, mu) {
   plogis(theta) * plogis(mu)
 }
@@ -994,7 +1013,7 @@ get_samples_from_mixture_model = function(
 
 Distribution of lapse rate (mixture 1 weight), bias (mixture 2 mean), and mean of psychometric model (mixture 2):
 
-```{r}
+```{r mixture-GLMM-plots-sample-correlations, warning=FALSE}
 get_samples_from_mixture_model(model = fit.lapse.mixed.mixture) %>%
   plotly::plot_ly(type = "scatter3d", mode = "markers") %>%
   plotly::add_trace(
@@ -1033,7 +1052,7 @@ get_samples_from_mixture_model(model = fit.lapse.mixed.mixture) %>%
 
 Visualizing predictions of the model:
 
-```{r }
+```{r mixture-GLMM-results-plots, fig.width=8, fig.height=16, message=FALSE}
 # Select a subject and show categorization based on posterior draws 
 plot_psychometric = function(
   model, 
@@ -1130,19 +1149,22 @@ ggsave(
   plot = p,
   file = "../figures/lapsing-logistic-GLMM-bySubjectCondition.png",
   width = 8, height = 20)
+```
 
+```{r, fig.width=8, fig.height=16, message=FALSE, fig.show='animate', animation.hook='gifski', interval=1/10}
 plot_psychometric(model = fit.lapse.mixed.mixture, animate = T) 
 ```
 
 Zooming in on Subject 1-4:
 
-```{r}
+```{r mixture-GLMM-results-plots-subject1-to-4, message=FALSE, fig.show='animate', animation.hook='gifski', interval=1/10, fig.width=8, fig.height=7.5}
 p <- plot_psychometric(model = fit.lapse.mixed.mixture, 1:4) + 
     transition_states(.draw, transition_length = 1, state_length = 1, wrap = T)
-animate(plot = p, 
-        renderer = gifski_renderer(
-          file = "../figures/lapsing-logistic-GLMM-bySubject124Condition.gif", 
-          width = 700, height = 1500))
+p
+# animate(plot = p, 
+#         renderer = gifski_renderer(
+#           file = "../figures/lapsing-logistic-GLMM-bySubject124Condition.gif", 
+#           width = 700, height = 1500))
 ```
 
 <!-- ## Same model but holding lapse rate constant -->
@@ -1212,22 +1234,6 @@ p = plot(conditional_effects(fit.1),
          points = T, 
          point_args = list(alpha = .05, height = .025, width = .025),
          theme = theme_fivethirtyeight())[[1]] 
-
-unstandardize = function(x) { x * Size.sd + Size.mu }
-standardize = function(x) { (x - Size.mu) / Size.sd }
-
-p.common =  
-  list(geom_hline(yintercept = .25, color = "black", linetype = 2),
-       scale_x_continuous(
-         "Letter size"), 
-       scale_y_continuous(
-         "Probability of correct response"),
-       coord_trans(
-         x = trans_new(
-           "unstandardize",
-           transform = "unstandardize",
-           inverse = "standardize")
-       ))
 
 p + p.common
 ```
