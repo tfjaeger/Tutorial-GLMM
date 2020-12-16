@@ -88,10 +88,27 @@ options(
 
 ```{r functions, include=F}
 my_hypotheses = function(model, prefix= "eta") {
-  rbind(
-    hypothesis(model, paste0(prefix, "_Size > 0"))$hypothesis, 
-    hypothesis(model, paste0(prefix, "_ConditionCrowded.vs.Uncrowded > 0"))$hypothesis,
-    hypothesis(model, paste0(prefix, "_Size:ConditionCrowded.vs.Uncrowded > 0"))$hypothesis) %>%
+  hypothesis(model, paste0(prefix, "_Size > 0"))$hypothesis %>%
+    mutate(Hypothesis = c("$\\beta_{Size}$ > 0")) %>%
+    { if (paste0("b_", prefix, "_ConditionCrowded.vs.Uncrowded") %in% parnames(model)) 
+      rbind(
+        ., 
+        rbind(    
+          hypothesis(model, paste0(prefix, "_ConditionCrowded.vs.Uncrowded < 0"))$hypothesis,
+          hypothesis(model, paste0(prefix, "_Size:ConditionCrowded.vs.Uncrowded < 0"))$hypothesis) %>%
+          mutate(Hypothesis = c("$\\beta_{Crowded}$ < 0", "$\\beta_{Size:Crowded}$ < 0"))) else . } %>%
+    { if (any(c("b_lambda_Intercept", "b_lapse_Intercept") %in% parnames(model))) 
+      rbind(
+        ., 
+        hypothesis(
+          model, 
+          paste0(
+            intersect(
+              c("b_lambda_Intercept", "b_lapse_Intercept"), 
+              parnames(model)), " > 0"), 
+          class = NULL)$hypothesis %>%
+          mutate(Hypothesis = "$\\lambda > 0$")) else . } %>% 
+    mutate_if(is.numeric, ~ round(.x, digits = 3)) %>%
     kable()
 }
 
@@ -102,35 +119,6 @@ my_hypotheses_mixture = function(model) my_hypotheses(model, prefix = "mu2")
 This tutorial aims to illustrate the relation between psychometric models (as used in psychophysics) and generalized linear models (GLMs) / generalized linear models (GLMMs). It's best to read it *after* reading the accompanying GL(M)M tutorial within the same git repository. 
 
 Psychometric models aim infer the 'threshold' and 'slope' of a categorization/recognition function along one or more stimulus dimensions (e.g., visual contrast, intensity, size, etc.). One challenge in doing so is that the exact function is unknown, though plausible candidates---such as the Weibull, Gumbel, logistic, cumulative Gaussian, etc.---exist ([quick side-by-side of these functions](http://psignifit.sourceforge.net/PSYCHOMETRICFUNCTIONS.html)). Another challenge is that the estimates of the threshold and slope parameters can be affected (and biased) if attentional lapses are not considered. 
-
-```{r load data, message=F}
-d = read_csv("../data/data_ClarkCrowding_TrialLevel.csv") 
-d %<>%
-  na.omit() %>%
-  droplevels() %>%
-  rename(
-    Condition = Crowded,
-    Threshold.Subj = Threshold,
-    DiffusionConstant.Subj = DiffusionConstant,
-    Span.Subj = Span,
-    Area.Subj = Area,
-    Curvature.Subj = Curvature,
-    Speed.Subj = Speed,
-    Size = Size,
-    Size.AvgPerformance = Performance,
-    ResponseExpected = Answer,
-    ResponseCorrect = Correct,
-    Curvature = TrialCurvature,
-    Speed = TrialSpeed,
-    Span = TrialSpan
-    ) %>%
-  mutate(Condition = factor(ifelse(Condition == 0, "uncrowded", "crowded"), 
-                            levels = c("uncrowded", "crowded"))) %>%
-  select(Subject, Condition, Threshold.Subj, DiffusionConstant.Subj, Area.Subj, Span.Subj, Speed.Subj, everything(), Span, Speed, Curvature) %>%
-  mutate_at(c("Subject"), factor)
-
-str(d)
-```
 
 
 # Readings and other materials
@@ -208,6 +196,40 @@ The two formulations describe the same outcomes but split up the relevant quanti
 
 This tutorial uses the R library \texttt{brms} for Bayesian regression modeling, which---among many other things---fits non-linear models. \texttt{brms} converts GL(M)Ms, GA(M)Ms, NL(M)Ms, and a number of other model types into \texttt{stan} code. \texttt{stan} is a model specification language with interfaces to Matlab, R, Python and other languages. It comes with an efficient sampler. \texttt{stan} programs are compiled into C++ code, sampled from, and the resulting posterior samples of the fitted model are returned ... in this case to R's \texttt{brms} functions. Using a Bayesian approach has a number of upsides, one of which is that the straightforwardness of obtaining (Bayesian) confidence intervals for any of the parameters in the model.
 
+## Data
+
+We use the same data as in the GLMM tutorial from Ashley's experiment. Please consult the GLMM tutorial for a detailed description of the experiment. As a reminder, here is an overview of the data:
+
+```{r load data, message=F}
+d = read_csv("../data/data_ClarkCrowding_TrialLevel.csv") 
+d %<>%
+  na.omit() %>%
+  droplevels() %>%
+  rename(
+    Condition = Crowded,
+    Threshold.Subj = Threshold,
+    DiffusionConstant.Subj = DiffusionConstant,
+    Span.Subj = Span,
+    Area.Subj = Area,
+    Curvature.Subj = Curvature,
+    Speed.Subj = Speed,
+    Size = Size,
+    Size.AvgPerformance = Performance,
+    ResponseExpected = Answer,
+    ResponseCorrect = Correct,
+    Curvature = TrialCurvature,
+    Speed = TrialSpeed,
+    Span = TrialSpan
+    ) %>%
+  mutate(Condition = factor(ifelse(Condition == 0, "uncrowded", "crowded"), 
+                            levels = c("uncrowded", "crowded"))) %>%
+  select(Subject, Condition, Threshold.Subj, DiffusionConstant.Subj, Area.Subj, Span.Subj, Speed.Subj, everything(), Span, Speed, Curvature) %>%
+  mutate_at(c("Subject"), factor)
+
+str(d)
+```
+
+
 ## Setting up the model
 As a first illustration, here is the formula describing a psychometric model with a logistic link function for the case of non-hierarchical data (data from a single subject). \texttt{brms} also allows us a more elegant way to formulate this model directly as a mixture model (see replies to \url{https://discourse.mc-stan.org/t/fitting-lapsing-psychometric-functions-with-brms/5762/2}) but the following non-linear model syntax is perhaps more transparent for the present purpose:
 
@@ -273,8 +295,10 @@ contrasts(d$Condition) = cbind("Crowded.vs.Uncrowded" = c(-.5,.5))
 
 ## Fitting the model
 
-```{r, message=F, warning=T, error=F}
-fit.lapse.1 <- brm(
+We fit the model with the function \texttt{brm()} from the library \texttt{brms}, and summarize the output:
+
+```{r simple-example-results, message=F, warning=T, error=F}
+fit.lambda0.1 <- brm(
   BF.lapse,
   data = d %>%
     filter(Subject == "1"),
@@ -285,8 +309,19 @@ fit.lapse.1 <- brm(
   file = "../models/subject-lapse-constrained"
 )
 
-summary(fit.lapse.1)
-p = plot(conditional_effects(fit.lapse.1), 
+summary(fit.lambda0.1)
+```
+
+We can test the hypotheses we hold about the various parameters in the model using Bayesian hypothesis testing, implemented via the function \texttt{hypothesis} foorm the same package:
+
+```{r simple-example-results-hypothesis-testing}
+my_hypotheses(fit.lambda0.1)
+```
+
+And, finally, we visualize the fit against the data, the predictions of the model along with 95\% uncertainty intervals.
+
+```{r simple-example-plots}
+p = plot(conditional_effects(fit.lambda0.1), 
          plot = F,
          points = T, 
          point_args = list(alpha = .05, height = .025, width = .025),
@@ -315,7 +350,7 @@ As this illustrates, fitting a lapsing model (likely adequately) leads to substa
 
 ## Determining the subject-specific threshold
 
-From a model like that fit in the previous section, we can obtain both naive and lapse-corrected performance thresholds. For lapse-corrected threshold, we need to solve the logistic part of the model for the desired threshold. Note that this is an approximate estimate. To get a better estimate, we should marginalize over all posterior samples. This will not necessarily the same as using the (mean) estimates for both the intercept and slope since the posterior distributions of the intercept and slope might be correlated. 
+Psychometric models are often used to obtain thresholds and slopes that are then submitted to secondary analysis. For example, we might obtain a stimulus threshold---i.e., a stimulus value at which a certain threshold performance (accuracy) is achieved---and then analyze whether that stimulus threshold differs across conditions. From a model like that fit in the previous section, we can obtain both naive and lapse-corrected performance thresholds. For lapse-corrected threshold, we need to solve the logistic part of the model for the desired threshold. Note that this is an approximate estimate. To get a better estimate, we should marginalize over all posterior samples. This will not necessarily the same as using the (mean) estimates for both the intercept and slope since the posterior distributions of the intercept and slope might be correlated. 
 
 \begin{align}
 logit(threshold) & = & \alpha + \beta * Size 
@@ -335,15 +370,17 @@ p +
   geom_segment(x = -0.2645872, xend = -0.2645872, y = 0, yend = .625, color = "red", inherit.aes = F)
 ```
 
+Similarly, we can obtain the lapse-corrected slope from the model. It is simply $\beta$. Being able to obtain thresholds or slopes is useful given the current standards of the field. Note though that off-the-shelf analyses techniques like GLMMs and extensions thereof make allow for a more direct approach of testing the effect of other factors (such as conditions) by simply including those predictors in the psychometric model. This more direct approach has the advantage that it does not throw away trial-level data (as the standard secondary analyses do not have access to the uncertainty of the threshold and slope estimates obtained from the psychometric model), allowing the combined model to more appropriately account for sources of uncertainty. The analyses presented in the remaining sections contain examples of this approach. 
 
+The advantage of this more direct approach becomes even further pronounced when we combined the data from all subjects and submit it to trial-level mixed-effects (hierarchical/multilevel) analyses. These analyses allow us to test whether the effects we observe in the trial-level data (e.g., about the effect of condition on aspects of the perceptual model) generalize across the population of interest. 
 
-# Illustrating the consequences of assumptions about lapse rates ($\lambda$)
+# Illustrating the consequences of assumptions about the lapse rate ($\lambda$)
 
 This section first present a simulation study (for which the ground truth is known) and then analyses based on Ashley Clark's data (for which the ground truth is unknown). Both case studies are intended to illustrate the consequences of assumptions about lapse rates---i.e., what happens when lapse rates are assumed to have a certain value, rather than being estimated.
 
 ## Simulation study
 
-We first make a data generator for a 2AFC task that creates data following the Wiechman and Hill (2001) model with a logistic response function:
+For our simulation study, we continue to consider a simple model as in the previous section, with only the intercept and an effect of the stimulus (rather than considering additional conditions). We first make a data generator for a 2AFC task that creates data following the Wiechman and Hill (2001) model with a logistic response function:
 
 ```{r simulation-generate-data-generator, echo=T}
 gelman_scale = function(x) {
@@ -411,7 +448,7 @@ for (i in 1:length(par.lambda)) {
 }
 ```
 
-Here is an example draw from the data generator with 100 data points per stimulus at five different stimulus locations between 0 and 3 for $\lambda = .05$. The first plot shows a fit if the lapse rate is assumed to be zero. The next plot adds the ground truth functional relation, including the lapse rate. The third plot shows the resulting bias in the intercept and slope of the perceptual model when the $\lambda$ is assumed to be 0 (blue) compared to the groundtruth of $\lambda = .05$ (gray).
+Here is an example draw from the data generator with 100 data points per stimulus at five different stimulus locations between 0 and 3 for $\lambda = .05$. The plot shows a fit if the lapse rate is assumed to be zero:
 
 ```{r simulation-example-data-plots, warning=FALSE}
 # without lapse
@@ -432,8 +469,11 @@ d.temp %>%
   scale_y_continuous(limits = c(0,1)) +
   theme_bw()
 ggsave(file = "../figures/simulation-example-psychometric-fit-noLapse.png", width = 5, height = 3.5)
+```
 
-# with lapse
+Next, we add the ground truth functional relation, including the lapse rate:
+
+```{r simulation-example-data-plots-add-ground-truth, warning=FALSE}
 d.temp %>%
   ggplot(aes(x = stimulus, y = accuracy)) +
   geom_hline(yintercept = 1- true.lambda, linetype = 2, color = "darkgray") +
@@ -478,9 +518,11 @@ ggsave(file = "../figures/simulation-example-psychometric-fit.png", width = 5, h
   #          x = 0, xend = 0, y = .75, yend = true.gamma + plogis(true.intercept), color = "darkgray", arrow = arrow(angle = 15, length = unit(.125, "inches"))) +
   # annotate(geom = "text", label = substitute(paste(alpha, "=", true.alpha), list(true.alpha= plogis(true.intercept))), 
   #          x = 0, y = .775, hjust = 0, color = "darkgray", size = 4) +
+```
 
+And, finally, we can compare the *perceptual model*---i.e., the functional relation (intercept and slope) between the stimulus and the responses when the participant responds based on the stimulus---when the $\lambda$ is assumed to be 0 (blue) compared to the ground truth of $\lambda = .05$ (gray).
 
-# just the psychometric model
+```{r simulation-example-data-plots-perceptual-model-only, warning=FALSE}
 estimates = update(analyses[[1]], newdata = d.temp, chains = 4, cores = 4) %>% fixef() %>% as_tibble() %>% pull(Estimate)
 tibble(stimulus = seq(0, 3, length.out = 100)) %>% 
  ggplot(aes(x = stimulus)) +
@@ -494,7 +536,7 @@ tibble(stimulus = seq(0, 3, length.out = 100)) %>%
       y = inv_logit_scaled(
         estimates[1] + estimates[2] * stimulus)),
     color = "blue") +
-  annotate(geom = "text", label = "groundtruth", x = 1.5, y = .75, hjust = 1, color = "darkgray", size = 4) +
+  annotate(geom = "text", label = "ground truth", x = 1.5, y = .75, hjust = 1, color = "darkgray", size = 4) +
   annotate(geom = "text", label = "estimate under\nassumption of 0 lapses", x = 1.5, y = .4, hjust = 0, color = "blue", size = 4) +
   scale_x_continuous("stimulus", breaks = -3:3) +
   scale_y_continuous("accuracy\n(when responding based on stimulus)", limits = c(0,1)) +
@@ -660,11 +702,13 @@ ggsave("../figures/simulation-bias-of-fixed-lambda-analyses.png", height = 8, wi
 
 ## Working with real data (unknown ground truth)
 
-We fit a series of model to the data from Subject 3 from Ashley data. For all models, we assume that $\gamma = .25$ (chance level accuracy in the 4AFC task). Like in the simulation study, all models considered in this section assume a logistic perceptual model. The models do, however, differ in their assumptions about $\lambda$. 
+Next, we illustrate the consequences of assumption about $\lambda$ for data from an actual experiment. We again use Ashley's data, this time focusing on Subject 3 from Ashley. Unlike in the simple example shown above, we now consider the effect of an experimental condition (crowdedness). For a description of this condition, see the GLMM tutorial. Here, we test whether the crowdedness of the display affected performance and whether this effect interacted with the effect of stimulus size. We do so while comparing psychometric models that differ in their assumptions about $\lambda$.
+
+For all models, we assume that $\gamma = .25$ (chance level accuracy in the 4AFC task). Like in the simulation study, all models considered in this section assume a logistic perceptual model. The models do, however, differ in their assumptions about $\lambda$. 
 
 ### Assuming a fixed lapse rate
 
-The first model assumes $\lambda = 0$ (no lapses):
+The first model assumes $\lambda = 0$ (no lapses). This model seems to present some evidence for an interaction between the crowdedness condition and the effect of stimulus size:
 
 ```{r subject3-lapse0, echo=T}
 BF <- brmsformula(
@@ -673,12 +717,14 @@ BF <- brmsformula(
   family = bernoulli(link="identity"),
   nl = TRUE
 ) 
+```
 
+```{r, message=FALSE, warning=FALSE}
 my.priors <- c(
   prior(student_t(3, 0, 2.5), class = "b", nlpar = "eta")
 )
 
-fit.nl.s3.noLapse <- brm(
+fit.nl.s3.lambda0 <- brm(
   BF,
   data = d %>%
     filter(Subject == "3"),
@@ -686,13 +732,13 @@ fit.nl.s3.noLapse <- brm(
   iter = 4000,
   thin = 5,
   prior = my.priors,
-  file = "../models/subject3-bias-noLapse"
+  file = "../models/subject3-lambda0"
 )
 
-my_hypotheses(fit.nl.s3.noLapse)
+my_hypotheses(fit.nl.s3.lambda0)
 p = plot(
   conditional_effects(
-    fit.nl.s3.noLapse,
+    fit.nl.s3.lambda0,
     conditions = make_conditions(d, "Condition")), 
   plot = F,
   points = T, 
@@ -701,7 +747,7 @@ p = plot(
 p + p.common
 ```
 
-The next two models assume non-zero lapse rates of $\lambda = .05$ and $\lambda = .2$, respectively:
+The next two models assume non-zero lapse rates of $\lambda = .05$ and $\lambda = .2$, respectively. Note how the strength of the evidence for an interaction systematically becomes weaker as we increase the $\lambda$. Of course, we do not know the ground truth, but it is worth noting that Subject 3 does not seem to achieve performance close to 100% accuracy even for the largest stimuli tested (there are both accurate and inaccurate answers at the largest size values in the crowded condition). Indeed, we will see in the next section that the *estimated* \$lambda$ is close to 25%.
 
 ```{r subject3-lapse05}
 BF <- brmsformula(
@@ -710,8 +756,10 @@ BF <- brmsformula(
   family = bernoulli(link="identity"),
   nl = TRUE
 ) 
+```
 
-fit.nl.s3.Lapse.05 <- brm(
+```{r, message=FALSE, warning=FALSE}
+fit.nl.s3.lambda0.05 <- brm(
   BF,
   data = d %>%
     filter(Subject == "3"),
@@ -719,13 +767,13 @@ fit.nl.s3.Lapse.05 <- brm(
   iter = 4000,
   thin = 5,
   prior = my.priors,
-  file = "../models/subject3-bias-Lapse.05"
+  file = "../models/subject3-lambda0.05"
 )
 
-my_hypotheses(fit.nl.s3.Lapse.05)
+my_hypotheses(fit.nl.s3.lambda0.05)
 p = plot(
   conditional_effects(
-    fit.nl.s3.Lapse.05,
+    fit.nl.s3.lambda0.05,
     conditions = make_conditions(d, "Condition")), 
   plot = F,
   points = T, 
@@ -743,8 +791,10 @@ BF <- brmsformula(
   family = bernoulli(link="identity"),
   nl = TRUE
 ) 
+```
 
-fit.nl.s3.Lapse.2 <- brm(
+```{r, message=FALSE, warning=FALSE}
+fit.nl.s3.lambda0.2 <- brm(
   BF,
   data = d %>%
     filter(Subject == "3"),
@@ -752,13 +802,13 @@ fit.nl.s3.Lapse.2 <- brm(
   iter = 4000,
   thin = 5,
   prior = my.priors,
-  file = "../models/subject3-bias-Lapse.2"
+  file = "../models/subject3-lambda0.2"
 )
 
-my_hypotheses(fit.nl.s3.Lapse.2)
+my_hypotheses(fit.nl.s3.lambda0.2)
 p = plot(
   conditional_effects(
-    fit.nl.s3.Lapse.2,
+    fit.nl.s3.lambda0.2,
     conditions = make_conditions(d, "Condition")), 
   plot = F,
   points = T, 
@@ -769,23 +819,25 @@ p + p.common
 
 ### Inferring the lapse rate from the data 
 
-We infer the lapse rate from the data while assuming it's constant across conditions:
+We infer the lapse rate from the data while assuming that it is constant across conditions. This is the assumption made in most psychometric analyses. It is, however, worth noting that this assumption can introduce bias. We have seen this bias in the simulation study presented above (see also the readings listed at the beginning of this document). 
 
 ```{r subject3-lapse-inferred, echo=T}
 BF <- brmsformula(
-  ResponseCorrect ~ .25 + (1-.25-lapse) * inv_logit(eta),
+  ResponseCorrect ~ .25 + (1-.25-lambda) * inv_logit(eta),
   eta ~ 1 + Size * Condition,
-  lapse ~ 1, 
+  lambda ~ 1, 
   family = bernoulli(link="identity"),
   nl = TRUE
 ) 
+```
 
+```{r, message=FALSE, warning=FALSE}
 my.priors <- c(
   prior(student_t(3, 0, 2.5), class = "b", nlpar = "eta"),
-  prior(beta(1, 1), nlpar = "lapse", lb = 0, ub = 1)
+  prior(beta(1, 1), nlpar = "lambda", lb = 0, ub = 1)
 )
 
-fit.nl.s3.Lapse <- brm(
+fit.nl.s3.lambda <- brm(
   BF,
   data = d %>%
     filter(Subject == "3"),
@@ -793,13 +845,13 @@ fit.nl.s3.Lapse <- brm(
   iter = 4000,
   thin = 5,
   prior = my.priors,
-  file = "../models/subject3-lapse"
+  file = "../models/subject3-lambda-inferred"
 )
 
-my_hypotheses(fit.nl.s3.Lapse)
+my_hypotheses(fit.nl.s3.lambda)
 p = plot(
   conditional_effects(
-    fit.nl.s3.Lapse,
+    fit.nl.s3.lambda,
     conditions = make_conditions(d, "Condition")), 
   plot = F,
   points = T, 
@@ -808,19 +860,16 @@ p = plot(
 p + p.common
 ```
 
+The estimated $\lambda$ is close to 25%. Of course, we do not know the ground truth for this data. It is possible, for example, that Subject 3's performance would continue to increase had the subject been tested at even larger stimulus sizes. And this means that estimating the joint distribution of $\lambda$, $\alpha$, and $\beta$ (as we have done here) can introduce bias into the estimated of $\alpha$ and $\beta$, despite the fact that it is the model that arguably more closely reflects that generative process underlying the data. Further adding to researchers' condundrum is the fact that the adaptive procedure used in this, and many other, experiments makes it particularly hard to reliably estimate $\lambda$ (see e.g., Prins, 2013). And this in turn can affect how biased and reliable the estimates of the *perceptual model* are ($\alpha$ and $\beta$, also Prins, 2013).
 
 
 
 
 
 
+# Combining the data from all subjects: mixed-effects psychometric models
 
-## Combining the data from all subjects
-
-One appeal of approaching psychometric data from the perspective of GLMMs is that we can apply the same random effect approach as in GLMMs for the lapse rate model (which then falls into the class of NLMMs). At this point, I am switching to the mixture formulation of the model as the NLMM formulation didn't converge (2 divergent transitions even with typical priors, thinning, etc.), and the mixture formulation is computationally more effective.
-
-Now that we're using a bit more data (all 6500 or so trials), the model will take a moment to fit. On my machine it took about 30 minutes. 
-
+One appeal of approaching psychometric data from the perspective of GLMMs is that we can apply the same random effect approach as in GLMMs for the lapse rate model (which then falls into the class of NLMMs). 
 
 # Weibull regression
 
