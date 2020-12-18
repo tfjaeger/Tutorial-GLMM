@@ -151,7 +151,9 @@ Further readings:
 
 
 
-# Psychometric functions
+# Psychometric models
+
+Psychometric models consist of two parts: a perceptual model that describes behavior (or neural responses) as a function of the stimulus and a component that describes what happens on the trials when a subject does not respond based on the stimulus.
 
 ## Perceptual model
 
@@ -159,7 +161,7 @@ In psychometric modeling, we predict subjects' responses from a stimulus value. 
 
 Four commonly used perceptual models include the cumulative Gaussian, logistic, Weibull, and Gumble (Generalized Extreme Value distribution a.k.a. log Weibull). For formal introductions, the relation between the different functions, and their relative trade-offs, see the readings listed at the top of this tutorial. Of relevance here is that any of these perceptual models can be expanded to account for the proportion of trials on which the subject responds independent of the stimulus (e.g., because the subject experienced an attentional lapse) and optionally the bias (or guessing rate) on those lapsing trials. 
 
-# Lapsing model (Wiechmann and Hill formulation)
+## Lapsing model (Wiechmann and Hill formulation)
 
 The lapse model can specified in two different ways. First, in the Wiechmann and Hill (2001) formulation:
 
@@ -167,11 +169,13 @@ The lapse model can specified in two different ways. First, in the Wiechmann and
 p(correct\ response | stimulus, \alpha, \beta, \lambda, \gamma) = \gamma + (1 - \lambda - \gamma) * p(correct\ response | stimulus, \alpha, \beta) 
 \end{align}
 
-where $p(correct\ response | stimulus, \alpha, \beta)$ is the \textbf{perceptual model}---i.e., the function that maps input stimuli onto responses (e.g,. the logistic model). This perceptual model depends on two parameters $\alpha$ and $\beta$ (under the the general modeling framework used in this tutorial, we can include further effects, including non-linear effects of the stimulus). The specific interpretation of these two parameters depends on the psychometric function, but each of the functions can be parameterized such that $\alpha$ is some targeted threshold performance, and $\beta$ is the 'slope' at that threshold. In addition to the two parameters of the perceptual model, the formula contains two more parameters: $\gamma$, which is sometimes called the {\em guess} rate, and $\lambda$, which is sometimes called the {\em lapse} rate. Guess and lapse are seemingly intuitive but ambiguous terms, which can cause confusion. In the Wiechmann and Hill formulation, $\gamma$ describes the performance that would be achieved if the participants guessed on all trials (i.e., chance performance), rather than the proportion of trials on which the participant guesses or the bias in the participant's responses *when* the participant guesses. Under this formulation, \textbf{$\gamma$ thus describes floor performance: the minimum proportion of correct answers}. The second parameter in the Wiechman and Hill formulation, $\lambda$, describes the proportion of trials on which participants provide the wrong answer, rather than the proportion of trials on which the participant does not respond based on the stimulus (e.g., because of attentional lapses). Under the Wiechman and Hill formulation, \textbf{$1 - \lambda$ thus describes the ceiling performance: the maximum proportion of correct answer}.
+where $p(correct\ response | stimulus, \alpha, \beta)$ is the \textbf{perceptual model}---i.e., the function that maps input stimuli onto responses (e.g,. the logistic model). This perceptual model depends on two parameters $\alpha$ and $\beta$ (under the the general modeling framework used in this tutorial, we can include further effects, including non-linear effects of the stimulus). The specific interpretation of these two parameters depends on the psychometric function, but each of the functions can be parameterized such that $\alpha$ is some targeted threshold performance, and $\beta$ is the 'slope' at that threshold. In addition to the two parameters of the perceptual model, the formula contains two more parameters: $\gamma$, which is sometimes called the {\em guess} rate, and $\lambda$, which is sometimes called the {\em lapse} rate. Guess and lapse are seemingly intuitive but ambiguous terms, which can cause confusion. In the Wiechmann and Hill formulation, $\gamma$ describes the performance that would be achieved if the participants guessed on all trials (i.e., chance performance), rather than the proportion of trials on which the participant guesses or the bias in the participant's responses *when* the participant guesses. Under this formulation, \textbf{$\gamma$ thus describes floor performance: the minimum proportion of correct answers}. The second parameter in the Wiechman and Hill formulation, $\lambda$, describes the proportion of trials on which participants provide the wrong answer, rather than the proportion of trials on which the participant does not respond based on the stimulus (e.g., because of attentional lapses). Under the Wiechman and Hill formulation, \textbf{$1 - \lambda$ thus describes the ceiling performance: the maximum proportion of correct answer}. This is the formulation that I use for most of the analyses below.
 
-# Lapsing model (mixture formulation)
+## Lapsing model (mixture formulation)
 
-An alternative formulation of the same process, describes the lapse model as a mixture model of two components. Like in the Wiechmann and Hill formulation, one component is the perceptual model describing how responses depend on the stimulus for those trials on which participant does respond based on the stimulus. The second component of the mixture model describes responses for trials on which the participant does not respond based on the stimulus. On those trials, the participant is assumed to respond with some *bias* that is independent of (uninformed by) the stimulus. Finally, the respective weights of the two components is determined by the proportion of trials on which the participant does not respond based on the stimulus (*lapse*). Note that *lapse* here is not the same as $\lambda$ under the Wiechmann and Hill formulation (neither is *bias* the same as $\gamma$/*guess* ). 
+An alternative formulation of the same process, describes the lapse model as a mixture model of two components. This formulation is computationally more efficient and easier to fit, as it orthogonalizes the two parameters that jointly determine the lapsing model ($\gamma$ and $\lambda$ in the Wiechmann and Hill formulation). But as far as I can see, the mixture formulation does not allow holding $\gamma$ or $\lambda$ constant. That is, the mixture formulation is efficient for scenarios in which we want to estimate both $\gamma$ or $\lambda$ (see example in appendix).
+
+Like in the Wiechmann and Hill formulation, one component of the mixture formulation is the perceptual model describing how responses depend on the stimulus for those trials on which participant does respond based on the stimulus. The second component of the mixture model describes responses for trials on which the participant does not respond based on the stimulus. On those trials, the participant is assumed to respond with some *bias* that is independent of (uninformed by) the stimulus. Finally, the respective weights of the two components is determined by the proportion of trials on which the participant does not respond based on the stimulus (*lapse*). Note that *lapse* here is not the same as $\lambda$ under the Wiechmann and Hill formulation (neither is *bias* the same as $\gamma$/*guess* ). 
 
 \begin{align}
 p(response | stimulus, \alpha, \beta, lapse, bias) = (1-lapse) * p(response | stimulus, \alpha, \beta) + lapse * bias
@@ -235,7 +239,7 @@ str(d)
 
 
 ## Setting up the model
-As a first illustration, here is the formula describing a psychometric model with a logistic link function for the case of non-hierarchical data (data from a single subject). \texttt{brms} also allows us a more elegant way to formulate this model directly as a mixture model (see replies to \url{https://discourse.mc-stan.org/t/fitting-lapsing-psychometric-functions-with-brms/5762/2}) but the following non-linear model syntax is perhaps more transparent for the present purpose:
+As a first illustration, here is the formula describing a psychometric model with a logistic link function for the case of non-hierarchical data (data from a single subject). \texttt{brms} also allows us a more elegant mixture formulation (see appendix and replies to \url{https://discourse.mc-stan.org/t/fitting-lapsing-psychometric-functions-with-brms/5762/2}) but the non-linear model implementation following Wiechmann and Hill (2001) is more transparent for the present purpose:
 
 ```{r, echo=T}
 # Defining a brms formula for the non-linear model. It has three components:
@@ -1098,11 +1102,11 @@ The Weibull model is not a GLM, even if not combined with the lapse rate model. 
 
 # Appendix
 
-# Inferring $\gamma$ 
+## Inferring $\gamma$ 
 
 The examples shown above assume that $\gamma$ is known. That is commonly the case. However, there are cases in which we want to fit both $\gamma$ and $\lambda$. 
 
-## Mixture formulation of the lapsing mixed-effects logistic model
+### Mixture formulation of the lapsing mixed-effects logistic model
 
 When inferring both $\gamma$ and $\lambda$ is substantially more efficient (and often necessary) to switch to the mixture formulation of the mode, as it allows us to orthogonalize $\gamma$ and $\lambda$. This makes this formulation of the model for computationally efficient, and more likely to converge. The mixture specification is, however, only available if the distributional family of the perceptual model is defined over real numbers (like the lapse part of the model). This is not, for example, the case for the Weibull (and hence Gumbel) model, which is defined over counts (integers). 
 
@@ -1365,7 +1369,7 @@ plot_psychometric(model = fit.lapse.mixed.mixture, animate = T)
 
 
 
-## NLM formulation of the lasping logistic model 
+### NLM formulation of the lasping logistic model 
 
 A less computationally efficient (or practical) way of inferring both $\gamma$ and $\lambda$ uses the NLM formulation used above when inferring only $\lambda$. This is illustrated here for a single subject (Subject 1). Note that this model did not converge and should not be trusted. More constraining priors and/or longer sampling might achieve convergence. This illustrates the challenges of inferring both $\lambda$ and $\gamma$, and highlights the advantage of the mixture formulation. 
 
