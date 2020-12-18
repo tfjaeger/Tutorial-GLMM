@@ -118,14 +118,16 @@ my_hypotheses_mixture = function(model) my_hypotheses(model, prefix = "mu2")
 # Goals of this tutorial
 This tutorial aims to illustrate the relation between psychometric models (as used in psychophysics) and generalized linear models (GLMs) / generalized linear models (GLMMs). It's best to read it *after* reading the accompanying GL(M)M tutorial within the same git repository. 
 
-Psychometric models aim infer the 'threshold' and 'slope' of a categorization/recognition function along one or more stimulus dimensions (e.g., visual contrast, intensity, size, etc.). One challenge in doing so is that the exact function is unknown, though plausible candidates---such as the Weibull, Gumbel, logistic, cumulative Gaussian, etc.---exist ([quick side-by-side of these functions](http://psignifit.sourceforge.net/PSYCHOMETRICFUNCTIONS.html)). Another challenge is that the estimates of the threshold and slope parameters can be affected (and biased) if attentional lapses are not considered. 
+Psychometric models aim infer the 'threshold' and 'slope' of a categorization/recognition function along one or more stimulus dimensions (e.g., visual contrast, intensity, size, etc.). One challenge in doing so is that the exact function is unknown, though plausible candidates---such as the Weibull, Gumbel, logistic, cumulative Gaussian, etc.---exist ([quick side-by-side of these functions](http://psignifit.sourceforge.net/PSYCHOMETRICFUNCTIONS.html)). Another challenge is that the estimates of the threshold and slope parameters can be affected (and biased) if attentional lapses are not considered or fixed to specific values. These biases persist even if the true lapse rate is constant across conditions of interest.
+
+\textbf{This tutorial is very much a work in progress and will benefit from your questions and comments.} I am aware that many sections are lacking context and some sections are incomplete. It is also possible that parts of the tutorial still contain errors. So please ask / comment away.
 
 
 # Readings and other materials
 
-To learn more about psychometric models, you might also find Gilchrist et al. (2005) and Wichmann and Hill (2001a, b) helpful (both in *Perception & Psychophysics*). Prins (2013, *Journal of Vision*) provides a counterpoint to the solution proposed in Wichmann and Hill (2001). All of these papers are relatively heavy on math. 
+To learn more about psychometric models, you might also find Gilchrist et al. (2005) and Wichmann and Hill (2001a, b) helpful (both in *Perception & Psychophysics*). Prins (2013, *Journal of Vision*) provides a counterpoint to the solution proposed in Wichmann and Hill (2001). All of these papers are relatively heavy on math but the Prins reading is written in a comparatively accessible style. 
 
-Luckily, there is a wealth of information out there, including introductory walk-throughs and powerful animated demonstrations. Here are some walk-through demonstrations (thanks to Martina Poletti, who pointed me to them):
+Luckily, there is a wealth of information out there, including introductory walk-throughs and powerful animated demonstrations. Here are some walk-through demonstrations (thanks to Martina Poletti for pointing me to these resources):
 
  * \url{http://www.dlinares.org/lapsesquickpsy.html} (partially replicating Wichmann’s point about biases, but also replicating Prins’s failure to replicate Wichmann’s proposed solution)
  * \url{http://www.palamedestoolbox.org/understandingfitting.html} (beautiful animations and visualizations explaining the fitting process, and the relation between lapse, threshold, and slope; really drives home the point that these three parameters form a joint distribution for which we’re trying to find the set of values that maximize the likelihood of the observed outcomes). Also goes through the Prins and Palamedes papers, and ends with a list of tips.
@@ -139,7 +141,7 @@ Some toolboxes/libraries for psychometric models:
    * [quickpsy](http://dlinares.org/quickpsy.html)
    * [psyphy](https://cran.r-project.org/web/packages/psyphy/index.html) include GLM-based psychometric model fitting, lapse models, and a variety of psychometric models (incl. cumulative Gaussian)
    * [modelfree](https://personalpages.manchester.ac.uk/staff/d.h.foster/software-modelfree/latest/home): non-parametric estimation of psychometric functions.
-   * [brms](https://cran.r-project.org/web/packages/brms/vignettes/brms_overview.pdf) can in principle fit outcomes that follow a Bernoulli, Weibull, or Generalized Extreme Value Distribution. This should cover the logistic, Weibull, Gumbel, and Generalized Extreme Value model. It's not yet clear to me whether \texttt{brms} would also be able to fit the cumulative Gaussian model. In any case though, at least the mixture specification is only available if the response part of the model is defined over real numbers (like the lapse part of the model). This is not, for example, the case for the Weibull (and hence Gumbel) model. The main appeal of \texttt{brms} in my view is that it's part of a more general framework of Bayesian model estimation and thus access to the full posterior distribution of all parameters (e.g., via \texttt{tidybayes}). [Summary of distributional families that can be specified in \texttt{brms}](https://cran.r-project.org/web/packages/brms/vignettes/brms_families.html).
+   * [brms](https://cran.r-project.org/web/packages/brms/vignettes/brms_overview.pdf) can in principle fit outcomes that follow a Bernoulli, Weibull, or Generalized Extreme Value Distribution. This should cover the logistic, Weibull, Gumbel, and Generalized Extreme Value models for psychometric fitting. It's not yet clear to me whether \texttt{brms} would also be able to fit the cumulative Gaussian model.The main appeal of \texttt{brms} in my view is that it's part of a more general framework of Bayesian model estimation and thus access to the full posterior distribution of all parameters (e.g., via \texttt{tidybayes}). [Summary of distributional families that can be specified in \texttt{brms}](https://cran.r-project.org/web/packages/brms/vignettes/brms_families.html).
    
 Further readings:
 
@@ -151,29 +153,31 @@ Further readings:
 
 # Psychometric functions
 
-In psychometric modeling, we predict subjects' responses from a stimulus value. A number of different predictive models are frequently used, with choices varying between labs, based on goodness of fit, or field-specific conventions. Of relevance to this class, all of these models fall into the class of non-linear models (NLM) and some are also generalized linear models (GLMs). That is, psychometric functions/modeling is partly a subset of the type of models we cover in this class, and partly closely related. The goal of this section is to illustrate the relation between GL(M)Ms and psychometric functions a bit further, so that your understanding of GL(M)Ms can also inform your analysis choices for psychometric data.
+## Perceptual model
 
-Four commonly used psychometric functions include the cumulative Gaussian, logistic, Weibull, and Gumble (Generalized Extreme Value distribution a.k.a. log Weibull). For formal introductions, the relation between the different functions, and their relative trade-offs, see also the readings listed at the top of this tutorial.
+In psychometric modeling, we predict subjects' responses from a stimulus value. Let's refer to this as the *perceptual model*. A number of different types of perceptual models are common in the field, with choices varying between labs, based on goodness of fit, or field-specific conventions. All of these models fall into the class of non-linear models (NLM) and some are also generalized linear models (GLMs). The goal of this section is to illustrate the relation between GL(M)Ms and psychometric functions a bit further, so that your understanding of GL(M)Ms can also inform your analysis choices for psychometric data.
 
-Any of these functions for the stimulus-driven model can be expanded to account for the proportion of trials on which the subject responds independent of the stimulus (e.g., because the subject experienced an attentional lapse) and optionally the bias (or guessing rate) on those lapsing trials. We'll start with some more background on the lapsing model.
+Four commonly used perceptual models include the cumulative Gaussian, logistic, Weibull, and Gumble (Generalized Extreme Value distribution a.k.a. log Weibull). For formal introductions, the relation between the different functions, and their relative trade-offs, see the readings listed at the top of this tutorial. Of relevance here is that any of these perceptual models can be expanded to account for the proportion of trials on which the subject responds independent of the stimulus (e.g., because the subject experienced an attentional lapse) and optionally the bias (or guessing rate) on those lapsing trials. 
 
-# Lapsing model
+# Lapsing model (Wiechmann and Hill formulation)
 
-The lapse model can specified in two different ways. First, in the Wiechman and Hill (2001) formulation:
+The lapse model can specified in two different ways. First, in the Wiechmann and Hill (2001) formulation:
 
 \begin{align}
 p(correct\ response | stimulus, \alpha, \beta, \lambda, \gamma) = \gamma + (1 - \lambda - \gamma) * p(correct\ response | stimulus, \alpha, \beta) 
 \end{align}
 
-where $p(correct\ response | stimulus, \alpha, \beta)$ is the \textbf{perceptual model}---i.e., the function that maps input stimuli onto responses (e.g,. the logistic model discussed above). This perceptual model depends on two parameters $\alpha$ and $\beta$. The specific interpretation of these two parameters depends on the psychometric function, but each of the functions can be parameterized such that $\alpha$ is some targeted threshold performance, and $\beta$ is the 'slope' at that threshold. In addition to the two parameters of the perceptual model, the formula contains two more parameters: $\gamma$, which is sometimes called the {\em guess} rate, and $\lambda$, which is sometimes called the {\em lapse} rate. Guess and lapse are seemingly intuitive but ambiguous terms, which can cause confusion. In the Wiechman and Hill formulation, $\gamma$ describes the performance that would be achieved if the participants guessed on all trials (i.e., chance performance), rather than the proportion of trials on which the participant guesses or the bias in the participant's responses *when* the participant guesses. Under this formulation, \textbf{$\gamma$ thus describes floor performance: the minimum proportion of correct answers}. The second parameter in the Wiechman and Hill formulation, $\lambda$, describes the proportion of trials on which participants provide the wrong answer, rather than the proportion of trials on which the participant does not respond based on the stimulus (e.g., because of attentional lapses). Under the Wiechman and Hill formulation, \textbf{$1 - \lambda$ thus describes the ceiling performance: the maximum proportion of correct answer}.
+where $p(correct\ response | stimulus, \alpha, \beta)$ is the \textbf{perceptual model}---i.e., the function that maps input stimuli onto responses (e.g,. the logistic model). This perceptual model depends on two parameters $\alpha$ and $\beta$ (under the the general modeling framework used in this tutorial, we can include further effects, including non-linear effects of the stimulus). The specific interpretation of these two parameters depends on the psychometric function, but each of the functions can be parameterized such that $\alpha$ is some targeted threshold performance, and $\beta$ is the 'slope' at that threshold. In addition to the two parameters of the perceptual model, the formula contains two more parameters: $\gamma$, which is sometimes called the {\em guess} rate, and $\lambda$, which is sometimes called the {\em lapse} rate. Guess and lapse are seemingly intuitive but ambiguous terms, which can cause confusion. In the Wiechmann and Hill formulation, $\gamma$ describes the performance that would be achieved if the participants guessed on all trials (i.e., chance performance), rather than the proportion of trials on which the participant guesses or the bias in the participant's responses *when* the participant guesses. Under this formulation, \textbf{$\gamma$ thus describes floor performance: the minimum proportion of correct answers}. The second parameter in the Wiechman and Hill formulation, $\lambda$, describes the proportion of trials on which participants provide the wrong answer, rather than the proportion of trials on which the participant does not respond based on the stimulus (e.g., because of attentional lapses). Under the Wiechman and Hill formulation, \textbf{$1 - \lambda$ thus describes the ceiling performance: the maximum proportion of correct answer}.
 
-An alternative formulation of the same processes, describes the lapse model as a mixture model of two components. Like in the Wiechman and Hill formulation, one component is the perceptual model describing how responses depend on the stimulus for those trials on which participant does respond based on the stimulus. The second component of the mixture model describes responses for trials on which the participant does not respond based on the stimulus. On those trials, the participant is assumed to respond with some *bias* that is independent of (uninformed by) the stimulus. Finally, the respective weights of the two components is determined by the proportion of trials on which the participant does not respond based on the stimulus (*lapse*). Note that *lapse* here is not the same as $\lambda$ under the Wiechman and Hill formulation (neither is *bias* the same as $\gamma$/*guess* ). 
+# Lapsing model (mixture formulation)
+
+An alternative formulation of the same process, describes the lapse model as a mixture model of two components. Like in the Wiechmann and Hill formulation, one component is the perceptual model describing how responses depend on the stimulus for those trials on which participant does respond based on the stimulus. The second component of the mixture model describes responses for trials on which the participant does not respond based on the stimulus. On those trials, the participant is assumed to respond with some *bias* that is independent of (uninformed by) the stimulus. Finally, the respective weights of the two components is determined by the proportion of trials on which the participant does not respond based on the stimulus (*lapse*). Note that *lapse* here is not the same as $\lambda$ under the Wiechmann and Hill formulation (neither is *bias* the same as $\gamma$/*guess* ). 
 
 \begin{align}
 p(response | stimulus, \alpha, \beta, lapse, bias) = (1-lapse) * p(response | stimulus, \alpha, \beta) + lapse * bias
 \end{align}
 
-Under this second formulation, the floor performance is $lapse * bias$ and the ceiling performance is $1 - (lapse - lapse * bias) = 1 - (1 - bias) * lapse$. While the *lapse* and *bias* parameters of this formulation are not the same as the $\lambda$ and $\gamma$ parameters of the Wiechman and Hill formulation, the parameters can be translated into each other: 
+Under this second formulation, the floor performance is $lapse * bias$ and the ceiling performance is $1 - (lapse - lapse * bias) = 1 - (1 - bias) * lapse$. While the *lapse* and *bias* parameters of this formulation are not the same as the $\lambda$ and $\gamma$ parameters of the Wiechmann and Hill formulation, the parameters can be translated into each other: 
 
 \begin{align}
 lapse = \gamma + \lambda \\
@@ -184,7 +188,7 @@ bias = \frac{\gamma}{(\gamma + \lambda)} \\
 
 For a demonstration of the second formulation, you can visit the interactive website at \url{https://hlplab.shinyapps.io/BayesianIdentificationAndDiscrimination/}. The site's first tab describes category identification (categorization) and perceptual discrimination for two Gaussian categories by an ideal observer. We'll focus on the "Ideal identification" plot (right side, in the middle of the lower half of the screen) and how it changes if you changes as a function of the rate of attentional lapsing (top left) and bias (unclick "Prior as bias" and then try out different biases). The ideal categorization function between two Gaussian categories turns out to be a logistic function (with linear and quadratic stimulus effects)---i.e., one of the psychometric functions mentioned above (and a GLM). So the effects of lapse rate and bias that you see on this site give you an initial idea of how these parameters can affect the fit of psychometric functions.
 
-The two formulations describe the same outcomes but split up the relevant quantities in different ways. Regardless of the formulation, the lapse model is *not* a GLM anymore (but it can still be fit with maximum likelihood fitting). 
+The two formulations describe the same outcomes but split up the relevant quantities in different ways. Regardless of the formulation, the lapse model is *not* a GLM anymore. 
 
 
 
@@ -474,20 +478,11 @@ ggsave(file = "../figures/simulation-example-psychometric-fit-noLapse.png", widt
 Next, we add the ground truth functional relation, including the lapse rate:
 
 ```{r simulation-example-data-plots-add-ground-truth, warning=FALSE}
-d.temp %>%
+p = d.temp %>%
   ggplot(aes(x = stimulus, y = accuracy)) +
   geom_hline(yintercept = 1- true.lambda, linetype = 2, color = "darkgray") +
   geom_hline(yintercept = true.gamma, linetype = 2, color = "darkgray") +
   stat_summary(fun.data = mean_cl_boot, geom = "pointrange") +
-  geom_line(
-    data = tibble(stimulus = seq(0, 3, length.out = 100), group = 1),
-    aes(
-      y = inv_logit_scaled(
-        true.intercept + true.slope * stimulus, 
-        lb = true.gamma, 
-        ub = 1),
-      group = group),
-    color = "blue") +
   geom_line(
     data = tibble(stimulus = seq(0, 3, length.out = 100), group = 1),
     aes(
@@ -507,6 +502,19 @@ d.temp %>%
   scale_x_continuous("stimulus", breaks = -3:3) +
   scale_y_continuous(limits = c(0,1)) +
   theme_bw()
+ggsave(p, file = "../figures/simulation-example-just-ground-truth.png", width = 5, height = 3.5)
+
+
+p +
+  geom_line(
+    data = tibble(stimulus = seq(0, 3, length.out = 100), group = 1),
+    aes(
+      y = inv_logit_scaled(
+        true.intercept + true.slope * stimulus, 
+        lb = true.gamma, 
+        ub = 1),
+      group = group),
+    color = "blue")
 ggsave(file = "../figures/simulation-example-psychometric-fit.png", width = 5, height = 3.5)
 
   # annotate(geom = "text", 
@@ -674,7 +682,34 @@ ggsave("../figures/simulation-correlation-intercept-slope.png", height = 8, widt
 In the following plots, the gray dashed lines indicate the ground truth. We are summarizing the distribution of estimates for the intercept and slope obtained for the different types of simulation runs (each with 100 simulation samples).
 
 ```{r plotting-simulation-plots-results}
+p = d.sim %>%
+  filter(
+    true.slope == 3,
+    stimuli == levels(factor(d.sim$stimuli))[1]) %>%
+  group_by(model.lambda, model.gamma, n_per_stimulus, stimuli) %>%
+  ggplot(aes(x = model.lambda, y = Estimate, color = stimuli)) +
+  geom_vline(xintercept = true.lambda, linetype = 2, color = "darkgray") +
+  geom_hline(
+    data = 
+      crossing(
+        term = c("intercept", "slope"),
+        true.intercept = unique(d.sim$true.intercept)) %>%
+      mutate(truth = ifelse(term == "intercept", true.intercept, true.slope)),
+    aes(yintercept = truth),
+    linetype = 2, color = "darkgray") +
+  stat_summary(fun.data = mean_cl_boot, geom = "pointrange", position = position_dodge(.01)) +
+  scale_x_continuous("lambda assumed in analysis\n(gamma is set to ground truth chance)") +
+  scale_color_discrete(
+    "stimulus distribution\nacross performance",
+    breaks = levels(factor(d.sim$stimuli)),
+    labels = c("low+mid+high performance", "mid performance", "mid+high performance")) +
+  facet_grid(term ~ true.intercept, scales = "free_y", labeller = "label_both") + 
+  theme_bw()
+ggsave(p, file = "../figures/simulation-bias-of-fixed-lambda-analyses-just-uniform-stimulus-scheme-true-slope3.png", height = 8, width = 9)
+
 d.sim %>%
+filter(
+    true.slope == 3) %>%
   group_by(model.lambda, model.gamma, n_per_stimulus, stimuli) %>%
   ggplot(aes(x = model.lambda, y = Estimate, color = stimuli)) +
   geom_vline(xintercept = true.lambda, linetype = 2, color = "darkgray") +
@@ -696,7 +731,7 @@ d.sim %>%
     labels = c("low+mid+high performance", "mid performance", "mid+high performance")) +
   facet_grid(term ~ true.intercept, scales = "free_y", labeller = "label_both") + 
   theme_bw()
-ggsave("../figures/simulation-bias-of-fixed-lambda-analyses.png", height = 8, width = 9)
+ggsave("../figures/simulation-bias-of-fixed-lambda-analyses-true-slope3.png", height = 8, width = 9)
 ```
 
 
@@ -706,7 +741,7 @@ Next, we illustrate the consequences of assumption about $\lambda$ for data from
 
 For all models, we assume that $\gamma = .25$ (chance level accuracy in the 4AFC task). Like in the simulation study, all models considered in this section assume a logistic perceptual model. The models do, however, differ in their assumptions about $\lambda$. 
 
-### Assuming a fixed lapse rate
+### Assuming a $\lambda$
 
 The first model assumes $\lambda = 0$ (no lapses). This model seems to present some evidence for an interaction between the crowdedness condition and the effect of stimulus size:
 
@@ -817,7 +852,7 @@ p = plot(
 p + p.common
 ```
 
-### Inferring the lapse rate from the data 
+### Inferring $\lambda$ from the data 
 
 We infer the lapse rate from the data while assuming that it is constant across conditions. This is the assumption made in most psychometric analyses. It is, however, worth noting that this assumption can introduce bias. We have seen this bias in the simulation study presented above (see also the readings listed at the beginning of this document). 
 
@@ -869,9 +904,148 @@ The estimated $\lambda$ is close to 25%. Of course, we do not know the ground tr
 
 # Combining the data from all subjects: mixed-effects psychometric models
 
-One appeal of approaching psychometric data from the perspective of GLMMs is that we can apply the same random effect approach as in GLMMs for the lapse rate model (which then falls into the class of NLMMs). 
+One appeal of approaching psychometric data from the perspective of GLMMs is that we can apply the same random effect approach as in GLMMs for the lapse rate model (which then falls into the class of NLMMs). The following is an example of the NLMM specification of the mixed-effects logistic model fit to Ashley's data.
 
-# Weibull regression
+```{r, echo=T}
+BF.lapse.mixed <- brmsformula(
+  # reparameterizing the model by fitting lapses in log-odds space (in order to aid convergence)
+  # this means we need to convert the lapses back into proportion space below.
+  ResponseCorrect ~ .25 + (.75-inv_logit(lapse)) * inv_logit(eta),
+  eta ~ 1 + Size * Condition (1 + Size | Subject),
+  lapse ~ 1 + (1 | Subject), 
+  family = bernoulli(link="identity"),
+  nl = TRUE
+)
+```
+
+```{r, message=F, warning=T, error=F}
+# note that I am not constraining the values of lambda here. But that could be achieved with the 
+# lower bound (lb) and upper bound (ub) arguments for the prior.
+my.priors.lapse <- c(
+  prior(student_t(3, 0, 2.5), class = "b", nlpar = "eta"),
+  prior(student_t(3, 0, 2.5), class = "b", nlpar = "lapse"),
+  prior(cauchy(0,2.5), class = "sd", nlpar = "eta"),
+  prior(cauchy(0,2.5), class = "sd", nlpar = "lapse")
+)
+
+fit.lapse.mixed <- brm(
+  BF.lapse.mixed,
+  data = d,
+  init = 0,
+  control = list(adapt_delta = 0.999),
+  iter = 8000,
+  thin = 5,
+  prior = my.priors.lapse,
+  file = "../models/subject-lapse-mixed-logit"
+)
+
+summary(fit.lapse.mixed)
+my_hypotheses(fit.lapse.mixed)
+```
+
+The following plots shows the predictions for each of 100 random posterior samples from each subjects (each curve corresponds to one posterior sample). The solid lines shows the predictions based on the *means* of the posterior samples. The reason this line does not always fall in the center of the other lines is that the three parameters of the model can be correlated (within and across participants). Taking the mean, rather than marginalizing over the entire posterior distribution, ignores those correlations (but is a *lot* faster to compute and thus used for the present purpose). The parameter summaries at the top left of each graph show those mean parameter values---i.e., those are the parameters of the solid line.
+
+
+```{r, fig.width=8, fig.height=16}
+d.fitted = fit.lapse.mixed %>% 
+  spread_draws(
+    b_eta_Intercept,
+    b_eta_Size,
+    b_lapse_Intercept,
+    r_Subject__eta[Subject, coef],
+    r_Subject__lapse[Subject, coef2],
+    n = 100) %>%
+  pivot_wider(
+    names_from = coef,
+    values_from = r_Subject__eta,
+  ) %>%
+  mutate(
+    b_eta_Intercept = b_eta_Intercept + Intercept,
+    b_eta_Size = b_eta_Size + Size,
+    b_lapse_Intercept = b_lapse_Intercept + r_Subject__lapse
+  ) %>%
+  ungroup() %>%
+  mutate_at("Subject", factor) %>%
+  expand(
+    nesting(
+      .draw, 
+      Subject,
+      b_eta_Intercept,
+      b_eta_Size,
+      b_lapse_Intercept),
+    Size = seq(-2.5, 2.5, .1)
+  )
+
+d.fitted %>%
+  ggplot(aes(x = Size, color = Subject)) +
+  geom_line(
+    aes(
+      y = inv_logit_scaled(
+        b_eta_Intercept + b_eta_Size * Size, 
+        lb = .25, 
+        ub = 1 - plogis(b_lapse_Intercept)),
+      group = paste(Subject, .draw)),
+    alpha = .1) +
+  geom_line(
+    data = . %>% 
+      group_by(Subject, Size) %>%
+      summarise(
+        b_eta_Intercept = mean(b_eta_Intercept),
+        b_eta_Size = mean(b_eta_Size),
+        b_lapse_Intercept = mean(plogis(b_lapse_Intercept))),
+    aes(
+      y = inv_logit_scaled(
+        b_eta_Intercept + b_eta_Size * Size, 
+        lb = .25, 
+        ub = 1 - b_lapse_Intercept),
+      group = Subject),
+    size = 1) +
+  geom_text(
+    data = . %>% 
+      group_by(Subject) %>%
+      summarise(
+        b_eta_Intercept = mean(b_eta_Intercept),
+        b_eta_Size = mean(b_eta_Size),
+        b_lapse_Intercept = mean(plogis(b_lapse_Intercept))),
+    x = -2.5, y = 1,
+    hjust = 0,
+    vjust = 1,
+    size = 3,
+    family = "Courier",
+    fontface = "bold",
+    color = "black",
+    aes(
+      group = Subject,
+      label = paste0(expression(eta), " = ", round(b_eta_Intercept, 2), " + ", round(b_eta_Size, 2), " * Size\n", 
+                     expression(lambda), " = ", round(b_lapse_Intercept, 2)))) +
+  facet_wrap(~ Subject, nrow = 4) +
+  theme_fivethirtyeight() +
+  p.common + ylim(0,1)
+
+# PS: a neat post on how to combine math expressions, variable values, and normal text in R:
+# https://trinkerrstuff.wordpress.com/2018/03/15/2246/
+```
+
+And the joint posterior distribution of the model's three fixed effect parameters (and could do similarly for each subject). This reveals a correlation between the intercept and slope of the model. To view this interactive plot you might have to compile (knit) this document to HTML (rather than PDF) or go through the code incrementally and then execute just this code chunk.
+
+```{r}
+fit.lapse.mixed %>% 
+  spread_draws(
+    b_eta_Intercept,
+    b_eta_Size,
+    b_lapse_Intercept) %>%
+  plotly::plot_ly(
+    x = ~b_eta_Intercept,
+    y = ~b_eta_Size,
+    z = ~b_lapse_Intercept,
+    alpha = .5
+  )
+```
+
+
+# Alternative perceptual models
+
+## Weibull regression
 
 The Weibull model is not a GLM, even if not combined with the lapse rate model. The Weibull has two parameters, the shape parameter $k$ and the scale parameter $\lambda$. Only if the shape parameter is known, is the remaining model a GLM (see \url{https://stats.stackexchange.com/questions/277466/is-weibull-distribution-a-exponential-family}).
 
@@ -918,25 +1092,6 @@ The Weibull model is not a GLM, even if not combined with the lapse rate model. 
   \caption{The Weibull regression is {\em not} a GLM, unless the shape parameter $k$ is fixed (a). The Weibull model with both its scale and shape parameter can thus be seen as an infinite set of GLMs.}
 \end{figure}
 
-```{r, message=F, warning=F, error=F}
-# This does not run since the Weibull is only defined over counts. 
-# It might work if the data is converted into a count representation but I need to understand this better first.
-
-# fit_mix.weibull <- brm(
-#   bf(ResponseCorrect ~ 1, 
-#      mu1 ~ 0 + offset(qlogis(.25)),
-#      mu2 ~ 1 + Size * Condition + (1 + Size * Condition | Subject), 
-#      theta1 ~ 1 + (1 | Subject)),
-#   data = d, 
-#   family = mixture(bernoulli("logit"), weibull("log"), order = "none"),
-#   init = 0,
-#   control = list(adapt_delta = 0.999),
-#   iter = 2000,
-#   thin = 1,
-#   prior = my.priors.lapse.mixture,
-#   file = "../models/subject-lapse-mixed-mixture-weibull")
-```
-
 
 
 
@@ -949,7 +1104,7 @@ The examples shown above assume that $\gamma$ is known. That is commonly the cas
 
 ## Mixture formulation of the lapsing mixed-effects logistic model
 
-When inferring both $\gamma$ and $\lambda$ is substantially more efficient (and often necessary) to switch to the mixture formulation of the mode, as it allows us to orthogonalize $\gamma$ and $\lambda$:
+When inferring both $\gamma$ and $\lambda$ is substantially more efficient (and often necessary) to switch to the mixture formulation of the mode, as it allows us to orthogonalize $\gamma$ and $\lambda$. This makes this formulation of the model for computationally efficient, and more likely to converge. The mixture specification is, however, only available if the distributional family of the perceptual model is defined over real numbers (like the lapse part of the model). This is not, for example, the case for the Weibull (and hence Gumbel) model, which is defined over counts (integers). 
 
 ```{r mixture-GLMM}
 my.priors.lapse.mixture <- c(
@@ -1208,38 +1363,11 @@ plot_psychometric(model = fit.lapse.mixed.mixture, animate = T)
 ```
 
 
-<!-- ## Same model but holding lapse rate constant -->
-
-<!-- ### At 0 -->
-
-<!-- ```{r} -->
-<!-- fit.lapse.mixed.mixture_fixedLapse.0 <- brm( -->
-<!--   bf(ResponseCorrect ~ 1,  -->
-<!--      mu1 ~ 0 + offset(1), -->
-<!--      mu2 ~ 1 + Size * Condition + (1 + Size * Condition | Subject),  -->
-<!--      theta1 ~ 0 + offset(qlogis(.25))), -->
-<!--   data = d,  -->
-<!--   family = mixture(bernoulli("identity"), bernoulli("logit"), order = "none"), -->
-<!--   init = 0, -->
-<!--   control = list(adapt_delta = 0.999), -->
-<!--   iter = 2000, -->
-<!--   thin = 1, -->
-<!--   prior = my.priors.lapse.mixture, -->
-<!--   file = "../models/subject-lapse-mixed-mixture-fixedLapse-0") -->
-
-<!-- p <- plot_psychometric(model = fit.lapse.mixed.mixture_fixedLapse.0, c(1,2,4), c(-.5, .5)) +  -->
-<!--     transition_states(.draw, transition_length = 1, state_length = 1, wrap = T) -->
-<!-- animate(plot = p,  -->
-<!--         renderer = gifski_renderer( -->
-<!--           file = "../figures/lapsing-logistic-GLMM-bySubject124Condition_fixedLapse-0.gif",  -->
-<!--           width = 700, height = 1500)) -->
-<!-- ``` -->
-
 
 
 ## NLM formulation of the lasping logistic model 
 
-A less computationally efficient (or practical) way of inferring both $\gamma$ and $\lambda$ uses the NLM formulation used above when inferring only $\lambda$. This is illustrated here for a single subject (Subject 1):
+A less computationally efficient (or practical) way of inferring both $\gamma$ and $\lambda$ uses the NLM formulation used above when inferring only $\lambda$. This is illustrated here for a single subject (Subject 1). Note that this model did not converge and should not be trusted. More constraining priors and/or longer sampling might achieve convergence. This illustrates the challenges of inferring both $\lambda$ and $\gamma$, and highlights the advantage of the mixture formulation. 
 
 ```{r, message=F, warning=T, error=F}
 BF <- brmsformula(
@@ -1315,144 +1443,6 @@ p = plot(conditional_effects(fit.2),
 p + p.common
 ```
 
-
-
-## NLMM formulation of the lasping mixed-effect logistic model 
-
-An example of the NLMM specification of the mixed-effects logistic model, but without crowdedness condition or its interaction with letter size since even this simplified model did not converge. (I first took this approach and then switched to the mixture formulation presented above.)
-
-```{r, echo=T}
-BF.lapse.mixed <- brmsformula(
-  # reparameterizing the model by fitting lapses in log-odds space (in order to aid convergence)
-  # this means we need to convert the lapses back into proportion space below.
-  ResponseCorrect ~ .25 + (.75-inv_logit(lapse)) * inv_logit(eta),
-  eta ~ 1 + Size + (1 + Size | Subject),
-  lapse ~ 1 + (1 | Subject), 
-  family = bernoulli(link="identity"),
-  nl = TRUE
-)
-```
-
-```{r, message=F, warning=T, error=F}
-my.priors.lapse <- c(
-  prior(student_t(3, 0, 2.5), class = "b", nlpar = "eta"),
-  prior(student_t(3, 0, 2.5), class = "b", nlpar = "lapse"),
-  prior(cauchy(0,2.5), class = "sd", nlpar = "eta"),
-  prior(cauchy(0,2.5), class = "sd", nlpar = "lapse")
-)
-
-fit.lapse.mixed <- brm(
-  BF.lapse.mixed,
-  data = d,
-  init = 0,
-  control = list(adapt_delta = 0.999),
-  iter = 8000,
-  thin = 5,
-  prior = my.priors.lapse,
-  file = "../models/subject-lapse-mixed-logit"
-)
-
-summary(fit.lapse.mixed)
-```
-
-The following plots shows the predictions for each of 100 random posterior samples from each subjects (each curve corresponds to one posterior sample). The solid lines shows the predictions based on the *means* of the posterior samples. The reason this line does not always fall in the center of the other lines is that the three parameters of the model can be correlated (within and across participants). Taking the mean, rather than marginalizing over the entire posterior distribution, ignores those correlations (but is a *lot* faster to compute and thus used for the present purpose). The parameter summaries at the top left of each graph show those mean parameter values---i.e., those are the parameters of the solid line.
-
-
-```{r, fig.width=8, fig.height=16}
-d.fitted = fit.lapse.mixed %>% 
-  spread_draws(
-    b_eta_Intercept,
-    b_eta_Size,
-    b_lapse_Intercept,
-    r_Subject__eta[Subject, coef],
-    r_Subject__lapse[Subject, coef2],
-    n = 100) %>%
-  pivot_wider(
-    names_from = coef,
-    values_from = r_Subject__eta,
-  ) %>%
-  mutate(
-    b_eta_Intercept = b_eta_Intercept + Intercept,
-    b_eta_Size = b_eta_Size + Size,
-    b_lapse_Intercept = b_lapse_Intercept + r_Subject__lapse
-  ) %>%
-  ungroup() %>%
-  mutate_at("Subject", factor) %>%
-  expand(
-    nesting(
-      .draw, 
-      Subject,
-      b_eta_Intercept,
-      b_eta_Size,
-      b_lapse_Intercept),
-    Size = seq(-2.5, 2.5, .1)
-  )
-
-d.fitted %>%
-  ggplot(aes(x = Size, color = Subject)) +
-  geom_line(
-    aes(
-      y = inv_logit_scaled(
-        b_eta_Intercept + b_eta_Size * Size, 
-        lb = .25, 
-        ub = 1 - plogis(b_lapse_Intercept)),
-      group = paste(Subject, .draw)),
-    alpha = .1) +
-  geom_line(
-    data = . %>% 
-      group_by(Subject, Size) %>%
-      summarise(
-        b_eta_Intercept = mean(b_eta_Intercept),
-        b_eta_Size = mean(b_eta_Size),
-        b_lapse_Intercept = mean(plogis(b_lapse_Intercept))),
-    aes(
-      y = inv_logit_scaled(
-        b_eta_Intercept + b_eta_Size * Size, 
-        lb = .25, 
-        ub = 1 - b_lapse_Intercept),
-      group = Subject),
-    size = 1) +
-  geom_text(
-    data = . %>% 
-      group_by(Subject) %>%
-      summarise(
-        b_eta_Intercept = mean(b_eta_Intercept),
-        b_eta_Size = mean(b_eta_Size),
-        b_lapse_Intercept = mean(plogis(b_lapse_Intercept))),
-    x = -2.5, y = 1,
-    hjust = 0,
-    vjust = 1,
-    size = 3,
-    family = "Courier",
-    fontface = "bold",
-    color = "black",
-    aes(
-      group = Subject,
-      label = paste0(expression(eta), " = ", round(b_eta_Intercept, 2), " + ", round(b_eta_Size, 2), " * Size\n", 
-                     expression(lambda), " = ", round(b_lapse_Intercept, 2)))) +
-  facet_wrap(~ Subject, nrow = 4) +
-  theme_fivethirtyeight() +
-  p.common + ylim(0,1)
-
-# PS: a neat post on how to combine math expressions, variable values, and normal text in R:
-# https://trinkerrstuff.wordpress.com/2018/03/15/2246/
-```
-
-And the joint posterior distribution of the model's three fixed effect parameters (and could do similarly for each subject). This reveals a correlation between the intercept and slope of the model:
-
-```{r}
-fit.lapse.mixed %>% 
-  spread_draws(
-    b_eta_Intercept,
-    b_eta_Size,
-    b_lapse_Intercept) %>%
-  plotly::plot_ly(
-    x = ~b_eta_Intercept,
-    y = ~b_eta_Size,
-    z = ~b_lapse_Intercept,
-    alpha = .5
-  )
-```
 
 
 
