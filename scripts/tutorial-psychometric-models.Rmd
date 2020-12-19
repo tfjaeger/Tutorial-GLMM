@@ -87,7 +87,10 @@ options(
 ```
 
 ```{r functions, include=F}
-my_hypotheses = function(model, prefix= "eta") {
+my_hypotheses = function(model, prefix= "eta", link_lambda = "identity") {
+  if (link_lambda == "logit") 
+    cat("NB: converting estimate and CIs for lambda into proportion space.\n The SE of the estimate, however, is in logits (since it cannot meaningfully be expressed in proportion space).")
+  
   hypothesis(model, paste0(prefix, "_Size > 0"))$hypothesis %>%
     mutate(Hypothesis = c("$\\beta_{Size}$ > 0")) %>%
     { if (paste0("b_", prefix, "_ConditionCrowded.vs.Uncrowded") %in% parnames(model)) 
@@ -107,6 +110,11 @@ my_hypotheses = function(model, prefix= "eta") {
               c("b_lambda_Intercept", "b_lapse_Intercept"), 
               parnames(model)), " > 0"), 
           class = NULL)$hypothesis %>%
+          { if (link_lambda == "logit") 
+            mutate_at(
+              .,
+              vars(Estimate, CI.Lower, CI.Upper),
+              plogis) else . } %>%
           mutate(Hypothesis = "$\\lambda > 0$")) else . } %>% 
     mutate_if(is.numeric, ~ round(.x, digits = 3)) %>%
     kable()
@@ -239,6 +247,7 @@ str(d)
 
 
 ## Setting up the model
+
 As a first illustration, here is the formula describing a psychometric model with a logistic link function for the case of non-hierarchical data (data from a single subject). \texttt{brms} also allows us a more elegant mixture formulation (see appendix and replies to \url{https://discourse.mc-stan.org/t/fitting-lapsing-psychometric-functions-with-brms/5762/2}) but the non-linear model implementation following Wiechmann and Hill (2001) is more transparent for the present purpose:
 
 ```{r, echo=T}
@@ -258,10 +267,10 @@ BF <- brmsformula(
 ) 
 ```
 
-Typically, the design of psychometric experiments is set up such that chance level accuracy ($\gamma$) is known. In that case, the model simplifies somewhat. For example, for the 4AFC task employed in Ashley's data, we would get the following model formula:
+Typically, the design of psychometric experiments is set up such that chance level accuracy ($\gamma$) is known. In that case, the model simplifies somewhat. For example, for the 4AFC task employed in Ashley's data, we would get chance level performance of 25% and thus $\gamma = .25$. This simplifies the model to the following formula:
 
 ```{r, echo=T}
-BF.lapse <- brmsformula(
+BF.lambda <- brmsformula(
   ResponseCorrect ~ .25 + (1-.25-lambda) * inv_logit(eta),
   eta ~ 1 + Size,
   lambda ~ 1, 
@@ -270,7 +279,7 @@ BF.lapse <- brmsformula(
 ) 
 ```
 
-For non-linear models, it can be important to incorporate constraints on the parameters, or any knowledge we have about plausible values for the parameters. Since we are taking a Bayesian approach here, this is achieved through the definition of priors. Throughout this tutorial, we only use very weakly regularizing priors---i.e., priors that do not bias the coefficient values in either direction but that 'pull' them closer to zero (following recommendations from \url{https://github.com/stan-dev/stan/wiki/Prior-Choice-Recommendations}). In effect, these priors implement Occam's razor: unless there is sufficient evidence in the data itself, we assume that the null hypothesis is true for all of our parameters. We can also define lower and upper bounds (lb and ub in the code) for, e.g., the $\lambda$ parameter. For example, for a model without any constraints on $\lambda$:
+For non-linear models, it can be important to incorporate constraints on the parameters, or any knowledge we have about plausible values for the parameters. Since we are taking a Bayesian approach here, this is achieved through the definition of priors. Throughout this tutorial, we only use very weakly regularizing priors---i.e., priors that do not bias the coefficient values in either direction but that 'pull' them closer to zero (following recommendations from \url{https://github.com/stan-dev/stan/wiki/Prior-Choice-Recommendations}). In effect, these priors implement Occam's razor: unless there is sufficient evidence in the data itself, we assume that the null hypothesis is true for all of our parameters. We can also define lower and upper bounds (lb and ub in the code) for, e.g., the $\lambda$ parameter. For example, for a model with a lower bound of 0 and an upper bound of .5 for $\lambda$:
 
 ```{r, echo=T}
 # Define weakly regularizing prior, including lower (lb) and upper bounds (ub)
@@ -303,18 +312,18 @@ contrasts(d$Condition) = cbind("Crowded.vs.Uncrowded" = c(-.5,.5))
 
 ## Fitting the model
 
-We fit the model with the function \texttt{brm()} from the library \texttt{brms}, and summarize the output:
+We fit the model to the data from Subject 1 with the function \texttt{brm()} from the library \texttt{brms}, and summarize the output:
 
 ```{r simple-example-results, message=F, warning=T, error=F}
 fit.lambda0.1 <- brm(
-  BF.lapse,
+  BF.lambda,
   data = d %>%
     filter(Subject == "1"),
     control = list(adapt_delta = 0.999),
   iter = 8000,
   thin = 5,
   prior = my.priors.lapse,
-  file = "../models/subject-lapse-constrained"
+  file = "../models/subject1-lambda-inferred-constrained"
 )
 
 summary(fit.lambda0.1)
@@ -520,16 +529,6 @@ p +
       group = group),
     color = "blue")
 ggsave(file = "../figures/simulation-example-psychometric-fit.png", width = 5, height = 3.5)
-
-  # annotate(geom = "text", 
-  #          label = substitute(
-  #            paste(alpha, "=", true.intercept, "; ", beta, "=", true.slope, "; ", gamma, "=", true.gamma, "; ", lambda, "=", true.lambda),
-  #            list(true.gamma = true.gamma, true.lambda = true.lambda, true.intercept = true.intercept, true.slope = true.slope)), 
-  #          x = 0, y = .9, hjust = 0, color = "darkgray", size = 4, fontface = "plain") +
-  # annotate(geom = "segment", 
-  #          x = 0, xend = 0, y = .75, yend = true.gamma + plogis(true.intercept), color = "darkgray", arrow = arrow(angle = 15, length = unit(.125, "inches"))) +
-  # annotate(geom = "text", label = substitute(paste(alpha, "=", true.alpha), list(true.alpha= plogis(true.intercept))), 
-  #          x = 0, y = .775, hjust = 0, color = "darkgray", size = 4) +
 ```
 
 And, finally, we can compare the *perceptual model*---i.e., the functional relation (intercept and slope) between the stimulus and the responses when the participant responds based on the stimulus---when the $\lambda$ is assumed to be 0 (blue) compared to the ground truth of $\lambda = .05$ (gray).
@@ -754,14 +753,12 @@ BF <- brmsformula(
   ResponseCorrect ~ .25 + (1-.25-0) * inv_logit(eta),
   eta ~ 1 + Size * Condition,
   family = bernoulli(link="identity"),
-  nl = TRUE
-) 
+  nl = TRUE) 
 ```
 
 ```{r, message=FALSE, warning=FALSE}
 my.priors <- c(
-  prior(student_t(3, 0, 2.5), class = "b", nlpar = "eta")
-)
+  prior(student_t(3, 0, 2.5), class = "b", nlpar = "eta"))
 
 fit.nl.s3.lambda0 <- brm(
   BF,
@@ -771,8 +768,7 @@ fit.nl.s3.lambda0 <- brm(
   iter = 4000,
   thin = 5,
   prior = my.priors,
-  file = "../models/subject3-lambda0"
-)
+  file = "../models/subject3-lambda0")
 
 my_hypotheses(fit.nl.s3.lambda0)
 p = plot(
@@ -793,8 +789,7 @@ BF <- brmsformula(
   ResponseCorrect ~ .25 + (1-.25-0.05) * inv_logit(eta),
   eta ~ 1 + Size * Condition,
   family = bernoulli(link="identity"),
-  nl = TRUE
-) 
+  nl = TRUE) 
 ```
 
 ```{r, message=FALSE, warning=FALSE}
@@ -806,8 +801,7 @@ fit.nl.s3.lambda0.05 <- brm(
   iter = 4000,
   thin = 5,
   prior = my.priors,
-  file = "../models/subject3-lambda0.05"
-)
+  file = "../models/subject3-lambda0.05")
 
 my_hypotheses(fit.nl.s3.lambda0.05)
 p = plot(
@@ -828,8 +822,7 @@ BF <- brmsformula(
   ResponseCorrect ~ .25 + (1-.25-0.2) * inv_logit(eta),
   eta ~ 1 + Size * Condition,
   family = bernoulli(link="identity"),
-  nl = TRUE
-) 
+  nl = TRUE) 
 ```
 
 ```{r, message=FALSE, warning=FALSE}
@@ -841,8 +834,7 @@ fit.nl.s3.lambda0.2 <- brm(
   iter = 4000,
   thin = 5,
   prior = my.priors,
-  file = "../models/subject3-lambda0.2"
-)
+  file = "../models/subject3-lambda0.2")
 
 my_hypotheses(fit.nl.s3.lambda0.2)
 p = plot(
@@ -866,15 +858,13 @@ BF <- brmsformula(
   eta ~ 1 + Size * Condition,
   lambda ~ 1, 
   family = bernoulli(link="identity"),
-  nl = TRUE
-) 
+  nl = TRUE) 
 ```
 
 ```{r, message=FALSE, warning=FALSE}
 my.priors <- c(
   prior(student_t(3, 0, 2.5), class = "b", nlpar = "eta"),
-  prior(beta(1, 1), nlpar = "lambda", lb = 0, ub = 1)
-)
+  prior(beta(1, 1), nlpar = "lambda", lb = 0, ub = 1))
 
 fit.nl.s3.lambda <- brm(
   BF,
@@ -884,8 +874,7 @@ fit.nl.s3.lambda <- brm(
   iter = 4000,
   thin = 5,
   prior = my.priors,
-  file = "../models/subject3-lambda-inferred"
-)
+  file = "../models/subject3-lambda-inferred")
 
 my_hypotheses(fit.nl.s3.lambda)
 p = plot(
@@ -908,142 +897,217 @@ The estimated $\lambda$ is close to 25%. Of course, we do not know the ground tr
 
 # Combining the data from all subjects: mixed-effects psychometric models
 
-One appeal of approaching psychometric data from the perspective of GLMMs is that we can apply the same random effect approach as in GLMMs for the lapse rate model (which then falls into the class of NLMMs). The following is an example of the NLMM specification of the mixed-effects logistic model fit to Ashley's data.
+One appeal of approaching psychometric data from the perspective of GLMMs is that we can apply the same random effect approach as in GLMMs for the lapse rate model (which then falls into the class of NLMMs). This allows us to combined trial-level repeated measures data from multiple subjects while maintained the assumption of (condition) independence of the observations---i.e., while avoiding the Type I error-inflation that would otherwise result if we combined data from multiple subjects.
 
+The following is an example of the NLMM specification of the mixed-effects logistic model fit to Ashley's data. In addition to combining the data from all 10 subjects in Ashley's data, we also expand the model to include the effect of the crowdedness condition and its interaction with the effect of stimulus size. That is, we are directly assessing the effects of interest (crowdedness condition) on the perceptual model (the $\alpha$ and $\beta$) at a *trial-level*. In this mixed-effect model, the fixed effects for stimulus size, condition, and the interaction are the population-level estimates---i.e., our best bet about the conclusion we would be warranted to draw about a representative (random) subject drawn from the *population of subjects* (not just our sample of 10 subjects). For this example, we further relaxed the range of $\lambda$ to be unconstrained. $\lambda$ is also allowed to vary across subjects (but not condition) and we model the full covariance matrix of all subject-specific effects, i.e., the covariance between the subject-specific $\lambda$s, intercepts, effects of stimulus size, crowdedness condition, and their interaction:
+ 
 ```{r, echo=T}
-BF.lapse.mixed <- brmsformula(
+BF.lambda.mixed <- brmsformula(
   # reparameterizing the model by fitting lapses in log-odds space (in order to aid convergence)
   # this means we need to convert the lapses back into proportion space below.
-  ResponseCorrect ~ .25 + (.75-inv_logit(lapse)) * inv_logit(eta),
-  eta ~ 1 + Size * Condition (1 + Size | Subject),
-  lapse ~ 1 + (1 | Subject), 
+  ResponseCorrect ~ .25 + (1 - .25 - inv_logit(lambda)) * inv_logit(eta),
+  eta ~ 1 + Size * Condition + (1 + Size * Condition | g | Subject),
+  lambda ~ 1 + (1 | g | Subject), 
   family = bernoulli(link="identity"),
-  nl = TRUE
-)
+  nl = TRUE)
 ```
+
+## Results
+
+Note how in this model we do not obtain *any* evidence in favor of a negative interaction between the effect of size and crowdedness condition. If anything, there is weak (non-decisive) support for a *positive* interaction: a slight *in*crease in the effect of size in the uncrowded condition. This is the conclusion we obtained when combining the data from all subjects while accounting for the hierarchical (grouping) structure of the data.
 
 ```{r, message=F, warning=T, error=F}
 # note that I am not constraining the values of lambda here. But that could be achieved with the 
 # lower bound (lb) and upper bound (ub) arguments for the prior.
 my.priors.lapse <- c(
   prior(student_t(3, 0, 2.5), class = "b", nlpar = "eta"),
-  prior(student_t(3, 0, 2.5), class = "b", nlpar = "lapse"),
+  prior(student_t(3, 0, 2.5), class = "b", nlpar = "lambda"), 
+  # prior(beta(1, 1), nlpar = "lambda", lb = 0, ub = qlogis(.75)),
   prior(cauchy(0,2.5), class = "sd", nlpar = "eta"),
-  prior(cauchy(0,2.5), class = "sd", nlpar = "lapse")
-)
+  prior(cauchy(0,2.5), class = "sd", nlpar = "lambda"))
 
-fit.lapse.mixed <- brm(
-  BF.lapse.mixed,
+fit.lambda.mixed <- brm(
+  BF.lambda.mixed,
   data = d,
   init = 0,
-  control = list(adapt_delta = 0.999),
-  iter = 8000,
+  control = list(adapt_delta = 0.9995, max_treedepth = 15),
+  iter = 10000,
   thin = 5,
   prior = my.priors.lapse,
-  file = "../models/subject-lapse-mixed-logit"
-)
+  file = "../models/subjectALL-lambda-mixed-logit")
 
-summary(fit.lapse.mixed)
-my_hypotheses(fit.lapse.mixed)
+summary(fit.lambda.mixed)
+my_hypotheses(fit.lambda.mixed, link_lambda = "logit")
 ```
 
-The following plots shows the predictions for each of 100 random posterior samples from each subjects (each curve corresponds to one posterior sample). The solid lines shows the predictions based on the *means* of the posterior samples. The reason this line does not always fall in the center of the other lines is that the three parameters of the model can be correlated (within and across participants). Taking the mean, rather than marginalizing over the entire posterior distribution, ignores those correlations (but is a *lot* faster to compute and thus used for the present purpose). The parameter summaries at the top left of each graph show those mean parameter values---i.e., those are the parameters of the solid line.
+## Obtaining the psychometric of all subjects in all conditions from a single model
 
+We visualize the predictions for each of 100 random posterior samples from each subjects (each curve corresponds to one posterior sample). These predictions are shown as the 100 thin lines. Together, they provide the information that we could alternatively express in a confidence interval, as the posterior samples of the model joint represent the posterior probability distribution estimated by the model. The solid lines shows the predictions based on the *means* of the posterior samples. This line does not have to fall in the center of the other lines is that the three parameters of the model can be correlated (within and across participants). Taking the mean, rather than marginalizing over the entire posterior distribution, ignores those correlations (but is a *lot* faster to compute and thus used for the present purpose). The parameter summaries at the top left of each graph show those mean parameter values---i.e., the parameters that describe the solid line:
 
-```{r, fig.width=8, fig.height=16}
-d.fitted = fit.lapse.mixed %>% 
-  spread_draws(
-    b_eta_Intercept,
-    b_eta_Size,
-    b_lapse_Intercept,
-    r_Subject__eta[Subject, coef],
-    r_Subject__lapse[Subject, coef2],
-    n = 100) %>%
-  pivot_wider(
-    names_from = coef,
-    values_from = r_Subject__eta,
-  ) %>%
-  mutate(
-    b_eta_Intercept = b_eta_Intercept + Intercept,
-    b_eta_Size = b_eta_Size + Size,
-    b_lapse_Intercept = b_lapse_Intercept + r_Subject__lapse
-  ) %>%
-  ungroup() %>%
-  mutate_at("Subject", factor) %>%
-  expand(
-    nesting(
-      .draw, 
-      Subject,
+```{r, fig.width=8, fig.height=16, warning=F, message=F}
+get_samples_from_nonlinear_model = function(
+  model, 
+  subject = levels(model$data$Subject), # or levels to be plotted
+  condition = levels(model$data$Condition), # or levels to be plotted
+  n.draws = 100
+) {
+  model %>% 
+    spread_draws(
+      b_lambda_Intercept,
       b_eta_Intercept,
       b_eta_Size,
-      b_lapse_Intercept),
-    Size = seq(-2.5, 2.5, .1)
-  )
+      b_eta_ConditionCrowded.vs.Uncrowded,
+      `b_eta_Size:ConditionCrowded.vs.Uncrowded`,
+      r_Subject__eta[Subject, coef],
+      r_Subject__lambda[Subject, coef2],
+      n = n.draws) %>%
+    pivot_wider(
+      names_from = coef,
+      values_from = r_Subject__eta,
+    ) %>%
+    mutate(
+      b_lambda = b_lambda_Intercept + r_Subject__lambda,
+      b_Intercept = b_eta_Intercept + Intercept,
+      b_Size = b_eta_Size + Size,
+      b_Condition = b_eta_ConditionCrowded.vs.Uncrowded + ConditionCrowded.vs.Uncrowded,
+      b_SizeCondition = `b_eta_Size:ConditionCrowded.vs.Uncrowded` + `Size:ConditionCrowded.vs.Uncrowded`
+    ) %>%
+    ungroup() %>%
+    mutate_at("Subject", factor) %>%
+    filter(Subject %in% subject) %>%
+    tidyr::expand(
+      nesting(
+        .draw, 
+        Subject,
+        b_lambda,
+        b_Intercept,
+        b_Size,
+        b_Condition,
+        b_SizeCondition),
+      Size = seq(-2.5, 2.5, .1),
+      Condition = condition) %>%
+    mutate(
+      Condition.num = contrasts(model$data$Condition)[Condition,])
+}
 
-d.fitted %>%
-  ggplot(aes(x = Size, color = Subject)) +
-  geom_line(
-    aes(
-      y = inv_logit_scaled(
-        b_eta_Intercept + b_eta_Size * Size, 
-        lb = .25, 
-        ub = 1 - plogis(b_lapse_Intercept)),
-      group = paste(Subject, .draw)),
-    alpha = .1) +
-  geom_line(
-    data = . %>% 
-      group_by(Subject, Size) %>%
-      summarise(
-        b_eta_Intercept = mean(b_eta_Intercept),
-        b_eta_Size = mean(b_eta_Size),
-        b_lapse_Intercept = mean(plogis(b_lapse_Intercept))),
-    aes(
-      y = inv_logit_scaled(
-        b_eta_Intercept + b_eta_Size * Size, 
-        lb = .25, 
-        ub = 1 - b_lapse_Intercept),
-      group = Subject),
-    size = 1) +
-  geom_text(
-    data = . %>% 
-      group_by(Subject) %>%
-      summarise(
-        b_eta_Intercept = mean(b_eta_Intercept),
-        b_eta_Size = mean(b_eta_Size),
-        b_lapse_Intercept = mean(plogis(b_lapse_Intercept))),
-    x = -2.5, y = 1,
-    hjust = 0,
-    vjust = 1,
-    size = 3,
-    family = "Courier",
-    fontface = "bold",
-    color = "black",
-    aes(
-      group = Subject,
-      label = paste0(expression(eta), " = ", round(b_eta_Intercept, 2), " + ", round(b_eta_Size, 2), " * Size\n", 
-                     expression(lambda), " = ", round(b_lapse_Intercept, 2)))) +
-  facet_wrap(~ Subject, nrow = 4) +
-  theme_fivethirtyeight() +
-  p.common + ylim(0,1)
+# not yet used
+get_samples_from_model = function(...) {
+  if (any(family(model) == "mixture"))
+    return(get_samples_from_mixture_model(...)) else
+      return(get_samples_from_nonlinear_model(...))
+}
 
-# PS: a neat post on how to combine math expressions, variable values, and normal text in R:
-# https://trinkerrstuff.wordpress.com/2018/03/15/2246/
+# Select a subject and show categorization based on posterior draws 
+plot_psychometric = function(
+  model, 
+  subject = levels(model$data$Subject), # or levels to be plotted
+  condition = levels(model$data$Condition), # or levels to be plotted
+  animate = T,
+  gamma = .25,
+  n.draws = 100
+) {
+  subject = unique(subject)
+  condition = unique(condition)    
+
+  p <- 
+    get_samples_from_nonlinear_model(
+      model = model, 
+      subject = subject,
+      condition = condition,
+      n.draws = n.draws) %>%
+    ggplot(aes(x = Size, color = Subject, linetype = Condition)) +
+    # individual lines
+    geom_line(
+      aes(
+        y = inv_logit_scaled(
+          b_Intercept + 
+          b_Condition * Condition.num + 
+          b_Size * Size + 
+          b_SizeCondition * Condition.num, 
+          lb = gamma,
+          ub = 1 - plogis(b_lambda)),
+        group = paste(Subject, Condition, .draw)),
+      alpha = if (!animate) .2 else 1) +
+    # by mean (solid) lines
+    { if (!animate) 
+      geom_line(
+        data = . %>% 
+          group_by(Subject, Size, Condition) %>%
+          summarise(
+            b_Intercept = mean(b_Intercept + b_Condition * Condition.num),
+            b_Size = mean(b_Size + b_SizeCondition * Condition.num),
+            b_lambda = mean(plogis(b_lambda))),
+        aes(
+          y = inv_logit_scaled(
+            b_Intercept + b_Size * Size, 
+            lb = gamma,
+            ub = 1 - b_lambda),
+          group = paste(Subject, Condition)),
+        size = 1.5) } + 
+    scale_linetype("Condition") +
+    theme_fivethirtyeight() +
+    p.common + ylim(0,1) +
+    geom_text(
+      data = . %>% 
+        { if (!animate) {
+          group_by(., Subject, Condition) %>%
+            summarise(
+              b_Intercept = mean(b_Intercept + b_Condition * Condition.num),
+              b_Size = mean(b_Size + b_SizeCondition * Condition.num),
+              b_lambda = mean(plogis(b_lambda))) 
+        } else { 
+          mutate(., 
+                 b_Intercept = b_Intercept + b_Condition * Condition.num,
+                 b_Size = b_Size + b_SizeCondition * Condition.num,
+                 b_lambda = plogis(b_lambda)) }},
+      x = -2.5, y = 1,
+      hjust = 0,
+      vjust = 1,
+      family = "Helvetica",
+      size = 4,
+      color = "black",
+      aes(
+        group = paste(Subject, Condition),
+        label = paste0(expression(eta), " = ", round(b_Intercept, 2), " + ", round(b_Size, 2), " * Size\n", 
+                       expression(gamma), " = ", round(gamma, 2), "\n", 
+                       expression(lambda), " = ", round(b_lambda, 2)))) +
+        facet_grid(Subject ~ Condition) 
+  
+  if (animate) 
+    p <- p + transition_states(.draw, transition_length = 1, state_length = 1)
+  
+  return(p)
+}
+
+p <- plot_psychometric(model = fit.lambda.mixed, animate = F) 
+plot(p)
+ggsave(
+  plot = p,
+  file = "../figures/lambda-logistic-GLMM-bySubjectCondition.png",
+  width = 8, height = 20)
 ```
 
-And the joint posterior distribution of the model's three fixed effect parameters (and could do similarly for each subject). This reveals a correlation between the intercept and slope of the model. To view this interactive plot you might have to compile (knit) this document to HTML (rather than PDF) or go through the code incrementally and then execute just this code chunk.
+We can use animation to illustrate the hierarchical nature of the model. **Note that this animation will only work in Acrobat Reader but not in Preview or other PDF readers.** Press the play button to start the animation. Each animation step correspond to a single posterior sample---i.e., one hypothesis about the parameter values for all fixed and random effects in the model. Note how the different posterior samples (each animation step) 'move in sync'. That is because the subject-specific predictions include the population-level predictions that are common to all subjects. 
 
-```{r}
-fit.lapse.mixed %>% 
+```{r, fig.width=8, fig.height=14, fig.show='animate', animation.hook='gifski', interval=1/10, warning=F, message=F}
+plot_psychometric(model = fit.lambda.mixed) 
+```
+
+## Visualizing correlations between $\lambda$ and the parameters of the perceptual model
+
+We can also visualize the joint posterior distribution of the model's fixed effect parameters. For example, the following plot visualizes the posterior distribution of the intercept (the average $\alpha$ across the two crowdedness conditions), the slope of stimulus size (the average $\beta$ across the two crowdedness conditions), and $\lambda$. Each point is a single posterior sampel from the model. This reveals a correlation between the three parameters. This is an interactive plot. If you see a message that your browser/device cannot display OpenGL, you might have to compile (knit) this document to HTML (rather than PDF) or go through the code incrementally and then execute just this code chunk. Similar plots could be obtained for any combination of parameters, including the subject-specific estimates of any parameter (\texttt{\url{shinystan::launch_shinystan()}}) provides an interactive HTML graphical user interface that lets you investigate any such correlations; you might know \texttt{R}'s Shiny apps from [webpages like this reporting COVID statistics](https://mappingmonroe.maps.arcgis.com/apps/opsdashboard/index.html#/217749730f174776a3896b3e8950e03b)).
+
+```{r, message=F, warning=F}
+fit.lambda.mixed %>% 
   spread_draws(
     b_eta_Intercept,
     b_eta_Size,
-    b_lapse_Intercept) %>%
+    b_lambda_Intercept) %>%
   plotly::plot_ly(
     x = ~b_eta_Intercept,
     y = ~b_eta_Size,
-    z = ~b_lapse_Intercept,
-    alpha = .5
-  )
+    z = ~b_lambda_Intercept,
+    alpha = .5)
 ```
 
 
@@ -1106,7 +1170,7 @@ The Weibull model is not a GLM, even if not combined with the lapse rate model. 
 
 The examples shown above assume that $\gamma$ is known. That is commonly the case. However, there are cases in which we want to fit both $\gamma$ and $\lambda$. 
 
-### Mixture formulation of the lapsing mixed-effects logistic model
+### Mixture formulation
 
 When inferring both $\gamma$ and $\lambda$ is substantially more efficient (and often necessary) to switch to the mixture formulation of the mode, as it allows us to orthogonalize $\gamma$ and $\lambda$. This makes this formulation of the model for computationally efficient, and more likely to converge. The mixture specification is, however, only available if the distributional family of the perceptual model is defined over real numbers (like the lapse part of the model). This is not, for example, the case for the Weibull (and hence Gumbel) model, which is defined over counts (integers). 
 
@@ -1155,7 +1219,6 @@ fit.lapse.mixed.mixture <- brm(
 my_hypotheses_mixture(fit.lapse.mixed.mixture)
 ```
 
-The following plots shows the predictions for each of 100 random posterior samples from each subjects (each curve corresponds to one posterior sample). The solid lines shows the predictions based on the *means* of the posterior samples. This line does not have to fall in the center of the other lines is that the three parameters of the model can be correlated (within and across participants). Taking the mean, rather than marginalizing over the entire posterior distribution, ignores those correlations (but is a *lot* faster to compute and thus used for the present purpose). The parameter summaries at the top left of each graph show those mean parameter values---i.e., those are the parameters of the solid line.
 
 ```{r mixture-GLMM-functions}
 get_gamma = function(theta, mu) {
@@ -1170,7 +1233,6 @@ get_samples_from_mixture_model = function(
   model, 
   subject = levels(model$data$Subject), # or levels to be plotted
   condition = levels(model$data$Condition), # or levels to be plotted
-  animate = T,
   n.draws = 100
 ) {
   model %>% 
@@ -1194,8 +1256,8 @@ get_samples_from_mixture_model = function(
       b_mu1_Intercept = b_mu1_Intercept + r_Subject__mu1,
       b_mu2_Intercept = b_mu2_Intercept + Intercept,
       b_mu2_Size = b_mu2_Size + Size,
-      b_mu2_Condition = b_mu2_ConditionCrowded.vs.Uncrowded + Size,
-      b_mu2_SizeCondition = `b_mu2_Size:ConditionCrowded.vs.Uncrowded` + Size
+      b_mu2_Condition = b_mu2_ConditionCrowded.vs.Uncrowded + ConditionCrowded.vs.Uncrowded,  # check whether this still runs. was + Size, but it think that was a typo
+      b_mu2_SizeCondition = `b_mu2_Size:ConditionCrowded.vs.Uncrowded` + `Size:ConditionCrowded.vs.Uncrowded`   # check whether this still runs. was + Size
     ) %>%
     ungroup() %>%
     mutate_at("Subject", factor) %>%
@@ -1219,7 +1281,7 @@ get_samples_from_mixture_model = function(
 }
 ```
 
-Distribution of lapse rate (mixture 1 weight), bias (mixture 2 mean), and mean of psychometric model (mixture 2):
+Next, we visualize the joint posterior distribution of the parameters of the model. First, the distribution of lapse rate (mixture 1 weight), bias (mixture 2 mean), and mean of psychometric model (mixture 2):
 
 ```{r mixture-GLMM-plots-sample-correlations, warning=FALSE}
 get_samples_from_mixture_model(model = fit.lapse.mixed.mixture) %>%
@@ -1258,7 +1320,7 @@ get_samples_from_mixture_model(model = fit.lapse.mixed.mixture) %>%
     marker = list(opacity = .05))
 ```
 
-Visualizing predictions of the model:
+Finally, we visualize the predictions for each of 100 random posterior samples from each subjects (each curve corresponds to one posterior sample). The solid lines shows the predictions based on the *means* of the posterior samples. This line does not have to fall in the center of the other lines is that the three parameters of the model can be correlated (within and across participants). Taking the mean, rather than marginalizing over the entire posterior distribution, ignores those correlations (but is a *lot* faster to compute and thus used for the present purpose). The parameter summaries at the top left of each graph show those mean parameter values---i.e., those are the parameters of the solid line:
 
 ```{r mixture-GLMM-results-plots, fig.width=8, fig.height=16, message=FALSE}
 # Select a subject and show categorization based on posterior draws 
@@ -1355,21 +1417,20 @@ p <- plot_psychometric(model = fit.lapse.mixed.mixture, animate = F)
 plot(p)
 ggsave(
   plot = p,
-  file = "../figures/lapsing-logistic-GLMM-bySubjectCondition.png",
+  file = "../figures/lapsing-logistic-mixture-GLMM-bySubjectCondition.png",
   width = 8, height = 20)
 ```
 
-We can use animation to further illustrate the hierarchical nature of the model. Note how the different posterior samples (each animation step) 'move in sync'. That is because the subject-specific predictions include the population-level predictions that are common to all subjects:
+And as an animationt to illustrate the covariation in the psychometric functions across subjects:
 
-
-```{r, fig.width=8, fig.height=16, message=FALSE, fig.show='animate', animation.hook='gifski', interval=1/10}
+```{r, fig.width=8, fig.height=14, message=FALSE, fig.show='animate', animation.hook='gifski', interval=1/10}
 plot_psychometric(model = fit.lapse.mixed.mixture, animate = T) 
 ```
 
 
 
 
-### NLM formulation of the lasping logistic model 
+### NLM formulation
 
 A less computationally efficient (or practical) way of inferring both $\gamma$ and $\lambda$ uses the NLM formulation used above when inferring only $\lambda$. This is illustrated here for a single subject (Subject 1). Note that this model did not converge and should not be trusted. More constraining priors and/or longer sampling might achieve convergence. This illustrates the challenges of inferring both $\lambda$ and $\gamma$, and highlights the advantage of the mixture formulation. 
 
@@ -1380,14 +1441,12 @@ BF <- brmsformula(
   gamma ~ 1,
   lambda ~ 1, 
   family = bernoulli(link="identity"),
-  nl = TRUE
-)
+  nl = TRUE)
 
 my.priors <- c(
   prior(student_t(3, 0, 2.5), class = "b", nlpar = "eta"),
   prior(beta(1, 1), nlpar = "gamma", lb = 0, ub = 1),
-  prior(beta(1, 1), nlpar = "lambda", lb = 0, ub = 1)
-)
+  prior(beta(1, 1), nlpar = "lambda", lb = 0, ub = 1))
 
 fit.1 <- brm(
   BF,
@@ -1397,8 +1456,7 @@ fit.1 <- brm(
   iter = 8000,
   thin = 5,
   prior = my.priors,
-  file = "../models/subject-lapse-bias"
-)
+  file = "../models/subject-lapse-bias")
 
 summary(fit.1)
 plot(fit.1)
