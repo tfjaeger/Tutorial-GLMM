@@ -133,7 +133,7 @@ Psychometric models aim infer the 'threshold' and 'slope' of a categorization/re
 
 # Readings and other materials
 
-To learn more about psychometric models, you might also find Gilchrist et al. (2005) and Wichmann and Hill (2001a, b) helpful (both in *Perception & Psychophysics*). Prins (2013, *Journal of Vision*) provides a counterpoint to the solution proposed in Wichmann and Hill (2001). All of these papers are relatively heavy on math but the Prins reading is written in a comparatively accessible style. 
+To learn more about psychometric models, you might also find Gilchrist et al. (2005) and Wichmann and Hill (2001a, b) helpful (both in *Perception & Psychophysics*). Prins (2012, 2013, *Journal of Vision*) provide a counterpoint to the solution proposed in Wichmann and Hill (2001). All of these papers are relatively heavy on math but the Prins readings are comparatively accessible. 
 
 Luckily, there is a wealth of information out there, including introductory walk-throughs and powerful animated demonstrations. Here are some walk-through demonstrations (thanks to Martina Poletti for pointing me to these resources):
 
@@ -161,17 +161,22 @@ Further readings:
 
 # Psychometric models
 
-Psychometric models consist of two parts: a perceptual model that describes behavior (or neural responses) as a function of the stimulus and a component that describes what happens on the trials when a subject does not respond based on the stimulus.
+Psychometric models consist of two parts: a perceptual model that describes behavior (or neural responses) as a function of the stimulus and a component that describes what happens on the trials when a subject does not respond based on the stimulus. 
 
 ## Perceptual model
 
 In psychometric modeling, we predict subjects' responses from a stimulus value. Let's refer to this as the *perceptual model*. A number of different types of perceptual models are common in the field, with choices varying between labs, based on goodness of fit, or field-specific conventions. All of these models fall into the class of non-linear models (NLM) and some are also generalized linear models (GLMs). The goal of this section is to illustrate the relation between GL(M)Ms and psychometric functions a bit further, so that your understanding of GL(M)Ms can also inform your analysis choices for psychometric data.
 
-Four commonly used perceptual models include the cumulative Gaussian, logistic, Weibull, and Gumble (Generalized Extreme Value distribution a.k.a. log Weibull). For formal introductions, the relation between the different functions, and their relative trade-offs, see the readings listed at the top of this tutorial. Of relevance here is that any of these perceptual models can be expanded to account for the proportion of trials on which the subject responds independent of the stimulus (e.g., because the subject experienced an attentional lapse) and optionally the bias (or guessing rate) on those lapsing trials. 
+Four commonly used perceptual models include the cumulative Gaussian, logistic, Weibull, and Gumble (Generalized Extreme Value distribution a.k.a. log Weibull). For formal introductions, the relation between the different functions, and their relative trade-offs, see the readings listed at the top of this tutorial. Theoretically, psychometric models can accommodate nonlinear effects of the stimulus as well as effects of multiple cue dimensions. Most commonly, however, the psychometric model is presented as a function of two parameters, $\alpha$ and $\beta$, that jointly describe a linear relation in a space determined by the type of perceptual model. For example, the standard logistic perceptual model describes a linear effect of the stimulus on the log-odds of a correct response:
+
+\begin{align}
+\log \frac{p(correct\ response | stimulus)}{p(incorrect\ response | stimulus)} = \alpha + \beta * stimulus
+\end{align}
+
 
 ## Lapsing model (Wiechmann and Hill formulation)
 
-The lapse model can specified in two different ways. First, in the Wiechmann and Hill (2001) formulation:
+Any perceptual model can be expanded to account for the proportion of trials on which the subject responds *in*dependent of the stimulus (e.g., because the subject experienced an attentional lapse). This is done by adding a parameter that accounts for the rate of such lapsing trials, and optionally for the response bias (or guessing rate) on those lapsing trials. This lapse model can specified in two different ways. First, in the Wiechmann and Hill (2001) formulation:
 
 \begin{align}
 p(correct\ response | stimulus, \alpha, \beta, \lambda, \gamma) = \gamma + (1 - \lambda - \gamma) * p(correct\ response | stimulus, \alpha, \beta) 
@@ -449,7 +454,7 @@ for (i in 1:length(par.lambda)) {
   for (j in 1:length(par.gamma)) {
     f = paste("accuracy ~", par.gamma[j], "+", 1-par.gamma[j]-par.lambda[i], "* inv_logit(eta)")
     
-    analyses[[paste(par.lambda[i], par.gamma[j])]] = brm(
+    analyses[[paste(par.lambda[i], par.gamma[j])]] <- brm(
       brmsformula(
         f,
         # Change to use s_stimulus if the gelman scaled stimulus is desired.
@@ -888,7 +893,7 @@ p = plot(
 p + p.common
 ```
 
-The estimated $\lambda$ is close to 25%. Of course, we do not know the ground truth for this data. It is possible, for example, that Subject 3's performance would continue to increase had the subject been tested at even larger stimulus sizes. And this means that estimating the joint distribution of $\lambda$, $\alpha$, and $\beta$ (as we have done here) can introduce bias into the estimated of $\alpha$ and $\beta$, despite the fact that it is the model that arguably more closely reflects that generative process underlying the data. Further adding to researchers' condundrum is the fact that the adaptive procedure used in this, and many other, experiments makes it particularly hard to reliably estimate $\lambda$ (see e.g., Prins, 2013). And this in turn can affect how biased and reliable the estimates of the *perceptual model* are ($\alpha$ and $\beta$, also Prins, 2013).
+The estimated $\lambda$ is close to 25%. Of course, we do not know the ground truth for this data. It is possible, for example, that Subject 3's performance would continue to increase had the subject been tested at even larger stimulus sizes. And this means that estimating the joint distribution of $\lambda$, $\alpha$, and $\beta$ (as we have done here) can introduce bias into the estimated of $\alpha$ and $\beta$, despite the fact that it is the model that arguably more closely reflects that generative process underlying the data. Further adding to researchers' conundrum is the fact that the adaptive procedure used in this, and many other, experiments makes it particularly hard to reliably estimate $\lambda$ (see e.g., Prins, 2013). And this in turn can affect how biased and reliable the estimates of the *perceptual model* are ($\alpha$ and $\beta$, also Prins, 2013).
 
 
 
@@ -960,7 +965,7 @@ get_samples_from_nonlinear_model = function(
       `b_eta_Size:ConditionCrowded.vs.Uncrowded`,
       r_Subject__eta[Subject, coef],
       r_Subject__lambda[Subject, coef2],
-      n = n.draws) %>%
+      ndraws = n.draws) %>%
     pivot_wider(
       names_from = coef,
       values_from = r_Subject__eta,
@@ -1246,7 +1251,7 @@ get_samples_from_mixture_model = function(
       r_Subject__theta1[Subject, coef2],
       r_Subject__mu1[Subject, coef3],
       r_Subject__mu2[Subject, coef],
-      n = n.draws) %>%
+      ndraws = n.draws) %>%
     pivot_wider(
       names_from = coef,
       values_from = r_Subject__mu2,
