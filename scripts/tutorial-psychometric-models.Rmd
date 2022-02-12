@@ -93,14 +93,14 @@ my_hypotheses = function(model, prefix= "eta", link_lambda = "identity") {
   
   hypothesis(model, paste0(prefix, "_Size > 0"))$hypothesis %>%
     mutate(Hypothesis = c("$\\beta_{Size}$ > 0")) %>%
-    { if (paste0("b_", prefix, "_ConditionCrowded.vs.Uncrowded") %in% parnames(model)) 
+    { if (paste0("b_", prefix, "_ConditionCrowded.vs.Uncrowded") %in% variables(model)) 
       rbind(
         ., 
         rbind(    
           hypothesis(model, paste0(prefix, "_ConditionCrowded.vs.Uncrowded < 0"))$hypothesis,
           hypothesis(model, paste0(prefix, "_Size:ConditionCrowded.vs.Uncrowded < 0"))$hypothesis) %>%
           mutate(Hypothesis = c("$\\beta_{Crowded}$ < 0", "$\\beta_{Size:Crowded}$ < 0"))) else . } %>%
-    { if (any(c("b_lambda_Intercept", "b_lapse_Intercept") %in% parnames(model))) 
+    { if (any(c("b_lambda_Intercept", "b_lapse_Intercept") %in% variables(model))) 
       rbind(
         ., 
         hypothesis(
@@ -108,7 +108,7 @@ my_hypotheses = function(model, prefix= "eta", link_lambda = "identity") {
           paste0(
             intersect(
               c("b_lambda_Intercept", "b_lapse_Intercept"), 
-              parnames(model)), " > 0"), 
+              variables(model)), " > 0"), 
           class = NULL)$hypothesis %>%
           { if (link_lambda == "logit") 
             mutate_at(
@@ -218,8 +218,17 @@ The two formulations describe the same outcomes but split up the relevant quanti
 This tutorial uses the R library \texttt{brms} for Bayesian regression modeling, which---among many other things---fits non-linear models. \texttt{brms} converts GL(M)Ms, GA(M)Ms, NL(M)Ms, and a number of other model types into \texttt{stan} code. \texttt{stan} is a model specification language with interfaces to Matlab, R, Python and other languages. It comes with an efficient sampler. \texttt{stan} programs are compiled into C++ code, sampled from, and the resulting posterior samples of the fitted model are returned ... in this case to R's \texttt{brms} functions. Using a Bayesian approach has a number of upsides, one of which is that the straightforwardness of obtaining (Bayesian) confidence intervals for any of the parameters in the model.
 
 ## Data
+We use the same data as in the GLMM tutorial from Ashley Clark's (as of 2022 unpublished) experiment on foveal crowding. \textbf{Do not share this data without Ashley's permission. Thank you.} The goals of Ashley's research are to (1) investigate the effect of crowding within the foveola, and (2) examine if and how fixational eye movements (FEMs) influence crowding at this scale. Based on previous research, we hypothesize that crowding will be detrimental to foveal vision, as it is in peripheral vision, but on a finer scale. Further, based on the recent findings that FEMs are beneficial for high-acuity vision, I expect a relationship between FEMs and the strength of crowding within the foveola, with larger and less precise FEMs increasing the negative effects visual crowding.
 
-We use the same data as in the GLMM tutorial from Ashley's experiment. Please consult the GLMM tutorial for a detailed description of the experiment. As a reminder, here is an overview of the data:
+Here, your goal is to test whether crowding---operationalized through two crowding conditions described below---affects the accuracy of number recognition. You will assess this while controlling for the size of the letters/numbers on the screen, as stimulus size is known to have large effects on recognition accuracy. We test two working hypotheses:
+
+ * (H1) Crowding will reduce recognition accuracy (after controlling for letter size)
+ * (H2) Letter size will have an increased effect in the more crowded displays.
+
+### Methods
+Studying FEMs during visual crowding within the foveola requires high-precision eye tracking and accuracy in localizing the center of gaze. Current video eye trackers do not have the required spatial precision, as the error of gaze localization is as large as the foveola itself. However, by using a custom built state-of-the-art eye tracking system with arcminute precision, we will be able to examine exactly how FEMs contribute to crowding within the foveola. Stimuli consist of a number-font designed specifically for studying crowding in the fovea, as it allows for recognition even when numbers are closer together than traditional optotypes used in other crowding studies.6 Two conditions will be examined, the uncrowded (where a single number is presented), and the crowded (where the same size number is presented, but with four surrounding numbers). The size of the number and spacing between the numbers in the crowded condition change throughout the experiment based on the subject’s performance using an adaptive procedure. The stimuli presented will vary in size, ranging from 0.5 arcminutes to 4 arcminutes in width. To determine the number-width threshold, we use a standard psychophysics procedure measuring the width of the stimulus at which a subject performs above chance level. 
+
+### Data overview
 
 ```{r load data, message=F}
 d = read_csv("../data/data_ClarkCrowding_TrialLevel.csv") 
@@ -402,7 +411,7 @@ This section first present a simulation study (for which the ground truth is kno
 
 ## Simulation study
 
-For our simulation study, we continue to consider a simple model as in the previous section, with only the intercept and an effect of the stimulus (rather than considering additional conditions). We first make a data generator for a 2AFC task that creates data following the Wiechman and Hill (2001) model with a logistic response function:
+For our simulation study, we continue to consider a simple model as in the previous section, with only the intercept and an effect of the stimulus (rather than considering additional conditions). We first make a data generator for a 2AFC task that creates data following the Wichmann and Hill (2001) model with a logistic response function:
 
 ```{r simulation-generate-data-generator, echo=T}
 gelman_scale = function(x) {
@@ -539,7 +548,12 @@ ggsave(file = "../figures/simulation-example-psychometric-fit.png", width = 5, h
 And, finally, we can compare the *perceptual model*---i.e., the functional relation (intercept and slope) between the stimulus and the responses when the participant responds based on the stimulus---when the $\lambda$ is assumed to be 0 (blue) compared to the ground truth of $\lambda = .05$ (gray).
 
 ```{r simulation-example-data-plots-perceptual-model-only, warning=FALSE}
-estimates = update(analyses[[1]], newdata = d.temp, chains = 4, cores = 4) %>% fixef() %>% as_tibble() %>% pull(Estimate)
+estimates = 
+  update(analyses[[1]], newdata = d.temp, chains = 4, cores = 4, backend = "cmdstanr") %>% 
+  fixef() %>% 
+  as_tibble() %>% 
+  pull(Estimate)
+
 tibble(stimulus = seq(0, 3, length.out = 100)) %>% 
  ggplot(aes(x = stimulus)) +
   geom_line(
@@ -603,7 +617,8 @@ if (file.exists("../models/simulation.RData")) {
                       newdata = d.temp,
                       cores = 4,
                       chains = 4,
-                      refresh = 0)
+                      refresh = 0, 
+                      backend = "cmdstanr")
                     
                     d.sim %<>%
                       rbind(
