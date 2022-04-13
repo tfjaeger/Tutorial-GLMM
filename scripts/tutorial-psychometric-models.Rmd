@@ -1192,7 +1192,7 @@ The examples shown above assume that $\gamma$ is known. That is commonly the cas
 
 ### Mixture formulation
 
-When inferring both $\gamma$ and $\lambda$ is substantially more efficient (and often necessary) to switch to the mixture formulation of the mode, as it allows us to orthogonalize $\gamma$ and $\lambda$. This makes this formulation of the model for computationally efficient, and more likely to converge. The mixture specification is, however, only available if the distributional family of the perceptual model is defined over real numbers (like the lapse part of the model). This is not, for example, the case for the Weibull (and hence Gumbel) model, which is defined over counts (integers). 
+When inferring both $\gamma$ and $\lambda$, it is substantially more efficient (and often necessary) to switch to the mixture formulation of the mode, as it allows us to orthogonalize $\gamma$ and $\lambda$. This makes this formulation of the model for computationally efficient, and more likely to converge. The mixture specification is, however, only available if the distributional family of the perceptual model is defined over real numbers (like the lapse part of the model). This is not, for example, the case for the Weibull (and hence Gumbel) model, which is defined over counts (integers). 
 
 ```{r mixture-GLMM}
 my.priors.lapse.mixture <- c(
