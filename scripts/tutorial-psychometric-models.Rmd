@@ -91,6 +91,8 @@ my_hypotheses = function(model, prefix= "eta", link_lambda = "identity") {
   if (link_lambda == "logit") 
     cat("NB: converting estimate and CIs for lambda into proportion space.\n The SE of the estimate, however, is in logits (since it cannot meaningfully be expressed in proportion space).")
   
+  lambda_h <- .05
+  
   hypothesis(model, paste0(prefix, "_Size > 0"))$hypothesis %>%
     mutate(Hypothesis = c("$\\beta_{Size}$ > 0")) %>%
     { if (paste0("b_", prefix, "_ConditionCrowded.vs.Uncrowded") %in% variables(model)) 
@@ -108,14 +110,14 @@ my_hypotheses = function(model, prefix= "eta", link_lambda = "identity") {
           paste0(
             intersect(
               c("b_lambda_Intercept", "b_lapse_Intercept"), 
-              variables(model)), " > 0"), 
+              variables(model)), " < ", if (link_lambda == "logit") qlogis(lambda_h) else lambda_h), 
           class = NULL)$hypothesis %>%
           { if (link_lambda == "logit") 
             mutate_at(
               .,
               vars(Estimate, CI.Lower, CI.Upper),
               plogis) else . } %>%
-          mutate(Hypothesis = "$\\lambda > 0$")) else . } %>% 
+          mutate(Hypothesis = paste("$\\lambda <$", lambda_h))) else . } %>% 
     mutate_if(is.numeric, ~ round(.x, digits = 3)) %>%
     kable()
 }
@@ -802,7 +804,7 @@ p = plot(
 p + p.common
 ```
 
-The next two models assume non-zero lapse rates of $\lambda = .05$ and $\lambda = .2$, respectively. Note how the strength of the evidence for an interaction systematically becomes weaker as we increase the $\lambda$. Of course, we do not know the ground truth, but it is worth noting that Subject 3 does not seem to achieve performance close to 100% accuracy even for the largest stimuli tested (there are both accurate and inaccurate answers at the largest size values in the crowded condition). Indeed, we will see in the next section that the *estimated* \$lambda$ is close to 25%.
+The next two models assume non-zero lapse rates of $\lambda = .05$ and $\lambda = .2$, respectively. Note how the strength of the evidence for an interaction systematically becomes weaker as we increase the $\lambda$. Of course, we do not know the ground truth, but it is worth noting that Subject 3 does not seem to achieve performance close to 100% accuracy even for the largest stimuli tested (there are both accurate and inaccurate answers at the largest size values in the crowded condition). Indeed, we will see in the next section that the *estimated* $\lambda$ is close to 25%.
 
 ```{r subject3-lapse05}
 BF <- brmsformula(
