@@ -1316,7 +1316,7 @@ get_samples_from_mixture_model(model = fit.lapse.mixed.mixture) %>%
     marker = list(opacity = .05))
 ```
 
-The reason for why sampling $\gamma$ and/or $\lambda$ directly becomes apparent when one looks at the distribution of $\gamma$ and/or $\lambda$---most of the values for both parameters are very close to one of the bounds (0): 
+The reason for why sampling $\gamma$ and/or $\lambda$ directly is difficult becomes apparent when one looks at the distribution of $\gamma$ and/or $\lambda$---most of the values for both parameters are very close to one of the bounds (0): 
 
 ```{r}
 get_samples_from_mixture_model(model = fit.lapse.mixed.mixture) %>%
