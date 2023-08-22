@@ -217,7 +217,7 @@ We are also still assuming:
  + Linearity of each effects
 
 But do so on the scale described by the link function $g$.
- 
+
  
 ## GLMMs
 
@@ -300,7 +300,50 @@ The GLMM softens the independence assumption of the GLM, instead assuming *condi
 
 For multiple random effects, we further assume that the multivariate Normal distributions for the different groups are independent of each (that's what the $\perp$ means in equation \ref{eq:glmm:perp}). All other assumptions are inherited from the GLM. 
 
+## Lik'em Bayesian? Adding priors
 
+What would change if we want to go Bayesian? Here I focus on the formulation of the model (but there are also differences in how the model is fit, and the output). Essentially, all we need to do is to add *priors* to all latent variables (free parameters) in the model (e.g., the $\beta$s). These priors can be seen as encoding our (the researchers') expectations about what would constitute plausible values for the parameters prior to having seen the data we wish to analyze. Fitting the model to the data will then update these prior beliefs/distributions, based on the data, to the posterior beliefs/distributions of the parameters. Those posterior distributions of the free parameters are what we base our statistical inferences and interpretations of the data on.
+
+We might set priors based on previous research, or based on a specific hypothesis. Those would be *informative* priors. Most often, however, research in the cognitive and neurosciences selects *uninformative* priors. Specifically, standard recommendations for Bayesian GLMM analyses often suggest *weakly regularizing* priors. Here, "regularizing" means that the prior has most probability mass over the null hypothesis, essentially 'pulling' the posterior estimate towards the null (i.e., being conservative). And "weakly" means that the prior is weak (i.e., wide), so that this 'pulling' towards zero is relatively gentle. Here's the resulting graphical model for GLMMs assuming weakly regularizing priors.^[Note that the strength of priors for, e.g., $\beta$s thus to be interpreted relative to the scale of the predictor. This is one of several reasons why it is recommended that all predictors are put on the same scale. Here we assume that all predictors are Gelman scaled (Gelman, 2008) by centering them and dividing them through twice their standard deviation.]
+
+\begin{figure}
+  \centering
+  \tikz{ %
+    \node[obs] (outcome) {$y_{i,j}$} ; %
+    \factor[above=of outcome] {distribution} {left: \textcolor{orange}{$f$}} {} {}; %
+    \node[det, above=of distribution] (mu) {$\mu_{i,j}$} ; %
+    \factor[above=of mu] {link} {left: \textcolor{blue}{$g^{-1}$}} {} {}; %
+    \node[obs, above=of link] (X) {$x_{i,j}$} ; %
+    \node[latent, right=of link] (betas) {$\beta_j$} ; %
+    \factor[right=of betas] {group} {below:$\mathcal{N}$} {} {}; %
+    \node[det, above=of group] (Sigma) {$\Sigma$} ; %
+    \factor[right=of Sigma] {Sigma-prior-prod} {below: $\times$} {} {} ; %
+    \node[latent, right=of Sigma-prior-prod, yshift=0.4cm] (Sigma-prior-tau) {$\tau$} ; %
+    \node[latent, right=of Sigma-prior-prod, yshift=-0.4cm] (Sigma-prior-rho) {R} ; %
+    \factor[right=of Sigma-prior-tau] {Sigma-prior-tau-dist} {right:$\mathcal{Cauchy(0, 2.5)}$} {} {} ; %
+    \factor[right=of Sigma-prior-rho] {Sigma-prior-rho-dist} {right: $\mathcal{LKJ(1)}$} {} {}; %
+    \node[latent, right=of group] (beta) {$\beta$} ; %
+    \factor[right=of beta] {beta-prior-dist} {right: $\mathcal{Student(0, 2.5, 3)}$} {} {} ; %
+    \node[obs, right=of X, above=of betas] (grouplevel) {$z_j$} ; %
+    % plates
+    \plate[inner sep=0.12cm, xshift=-0.06cm, yshift=0.06cm] {plate1} {(mu) (distribution) (link) (X) (outcome)} {$N $}; %
+    \plate[inner sep=0.12cm, xshift=-0.06cm, yshift=0.06cm] {plate2} {(mu) (distribution) (link) (betas) (X) (outcome) (grouplevel) (plate1) } {$M $}; %
+    \edge {distribution} {outcome} ; %
+    \edge {mu} {distribution} ; %
+    \edge {link} {mu} ; %
+    \edge {X, betas, grouplevel} {link} ; %
+    \edge {group} {betas} ; %
+    \edge {beta-prior-dist} {beta} ; %
+    \edge {Sigma, beta} {group} ; %
+    \edge {Sigma-prior-prod} {Sigma} ; %
+    \edge {Sigma-prior-tau, Sigma-prior-rho} {Sigma-prior-prod} ; %
+    \edge {Sigma-prior-tau-dist} {Sigma-prior-tau} ; %
+    \edge {Sigma-prior-rho-dist} {Sigma-prior-rho} ; %
+  }
+  \caption{Bayesian Generalized linear mixed model (GLMM) with weakly regularizing priors: a uniform distribution over the correlation matrix of the random effects (R), a Cauchy distribution with location parameter 0 for the standard deviations of the random effects ($\tau$), and a Student $t$ distribution with location 0 for the fixed effects ($\beta$). The split of the variance-covariance matrix of the random effects $\Sigma$ into a correlation matrix and a vector of standard deviations is not strictly necessary but since it is often used in the actual implementation of GLMMs, we follow it here.}
+\end{figure}
+
+The remainder of this homework uses frequentist GLMMs.
 
 ## Writing up the results of a GLMM analysis
 
