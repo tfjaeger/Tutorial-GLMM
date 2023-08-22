@@ -291,7 +291,7 @@ The grouping variables can also be hierarchically organized (e.g., a national sa
   }
   \caption{Generalized linear mixed model (GLMM)}
   \end{subfigure}
-  \caption{The GLM and GLMM side by side. For the GLMM, $z_j$ is the $j$th level of the grouping variable $z$, which select which $\beta_j$ is to be chosen for the present case (i.e., $j$ here corresponds to $group\ level$ in equation \ref{eq:glmm:group}.}
+  \caption{The GLM and GLMM side by side. For the GLMM, $z_j$ is the $j$th level of the grouping variable $z$, which select which $\beta_j$ is to be chosen for the present case (i.e., $j$ here corresponds to $group\ level$ in equation \ref{eq:glmm:group}).}
 \end{figure}
 
 ## Assumptions of the GLMM

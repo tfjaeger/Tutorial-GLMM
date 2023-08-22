@@ -88,7 +88,57 @@ theme_set(theme_wsj())
 
 
 # Overview
-This document is intended as in-class material. Make sure to first work through the homework in preparation for this class. We now continue to work through the same data set as in the homework.
+This document is intended as in-class material. Make sure to first work through the homework in preparation for this class. It contains, for example, a graphical model formulation of GLMs and GLMMs that you might find helpful, repeated here:
+
+
+\begin{figure}
+  \centering
+  \begin{subfigure}[b]{0.45\textwidth}
+  \tikz{ %
+    \node[obs] (outcome) {$y_i$} ; %
+    \factor[above=of outcome] {distribution} {left: \textcolor{orange}{distribution $f$}} {} {}; %
+    \node[det, above=of distribution] (mu) {$\mu_i$} ; %
+    \factor[above=of mu] {link} {left: \textcolor{blue}{inverse link $g^{-1}$}} {} {}; %
+    \node[obs, above=of link] (X) {$x_i$} ; %
+    \node[latent, right=of X] (beta) {$\beta$} ; %
+    % plates
+    \plate[inner sep=0.12cm, xshift=-0.06cm, yshift=0.06cm] {plate1} {(mu) (distribution) (link) (X) (outcome)} {$\forall i=1 \ldots N $}; %
+    \edge {distribution} {outcome} ; %
+    \edge {mu} {distribution} ; %
+    \edge {link} {mu} ; %
+    \edge {X, beta} {link} ; %
+  }
+  \caption{Generalized linear model (GLM)}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.45\textwidth}
+  \tikz{ %
+    \node[obs] (outcome) {$y_{i,j}$} ; %
+    \factor[above=of outcome] {distribution} {left: \textcolor{orange}{$f$}} {} {}; %
+    \node[det, above=of distribution] (mu) {$\mu_{i,j}$} ; %
+    \factor[above=of mu] {link} {left: \textcolor{blue}{$g^{-1}$}} {} {}; %
+    \node[obs, above=of link] (X) {$x_{i,j}$} ; %
+    \node[latent, right=of link] (betas) {$\beta_j$} ; %
+    \factor[right=of betas] {group} {below:$\mathcal{N}$} {} {}; %
+    \node[latent, above=of group] (Sigma) {$\Sigma$} ; %
+    \node[latent, right=of group] (beta) {$\beta$} ; %
+    \node[obs, right=of X, above=of betas] (grouplevel) {$z_j$} ; %
+    % plates
+    \plate[inner sep=0.12cm, xshift=-0.06cm, yshift=0.06cm] {plate1} {(mu) (distribution) (link) (X) (outcome)} {$N $}; %
+    \plate[inner sep=0.12cm, xshift=-0.06cm, yshift=0.06cm] {plate2} {(mu) (distribution) (link) (betas) (X) (outcome) (grouplevel) (plate1) } {$M $}; %
+    \edge {distribution} {outcome} ; %
+    \edge {mu} {distribution} ; %
+    \edge {link} {mu} ; %
+    \edge {X, betas, grouplevel} {link} ; %
+    \edge {group} {betas} ; %
+    \edge {Sigma, beta} {group} ; %
+  }
+  \caption{Generalized linear mixed model (GLMM)}
+  \end{subfigure}
+  \caption{The GLM and GLMM side by side. For the GLMM, $z_j$ is the $j$th level of the grouping variable $z$, which select which $\beta_j$ is to be chosen for the present case (see homework for details).}
+\end{figure}
+
+We now continue to work through the same data set as in the homework.
 
 ```{r load data, include=F}
 d = read_csv("../data/data_ClarkCrowding_TrialLevel.csv") 
@@ -136,7 +186,6 @@ Note also a few other changes that reflect my personal preference:
  * I try to keep the sentence structure parallel between the different effect (e.g., "We found ..." *or* "There was ..." but not both).
  * I try to keep the perspective on the results constant across effect (e.g. "increased/decreased performance" *or* "higher/lower proportion of correct answers")
  * I try to code condition in a way that the values for the condition predictor are positive for the 'treatment' and negative for the 'control'/'baseline'. Similarly, I report the results using language that compares the treatment against the control rather than the other way around.
-
 
 
 
@@ -269,6 +318,46 @@ Data analyses standards keep changing, and it seems fair to say that there is an
    * This includes coherent measures for replication success that avoid the dichotomy of significance-based reasoning (e.g., Verhagen \& Wagenmakers, 2014; for a Bayesian replication test for GLMMs, see Xie et al., 2020).
  * Priors can help convergence, especially for more complex models. There are pros and cons to the role of priors, but weakly regularizing priors can serve as an intuitive implementation of Occam's razor without biasing the direction of the inferred effects. 
  * Access to the full posterior distribution of *all* parameters in the model. For GLMMs, this includes the estimated variances and correlations of the grouping (random) effects, which are point estimates under the frequentist approach. 
+ 
+A graphical model of Bayesian GLMMs was given in the homework preparation for this class. It's repeated below:
+
+
+\begin{figure}
+  \centering
+  \tikz{ %
+    \node[obs] (outcome) {$y_{i,j}$} ; %
+    \factor[above=of outcome] {distribution} {left: \textcolor{orange}{$f$}} {} {}; %
+    \node[det, above=of distribution] (mu) {$\mu_{i,j}$} ; %
+    \factor[above=of mu] {link} {left: \textcolor{blue}{$g^{-1}$}} {} {}; %
+    \node[obs, above=of link] (X) {$x_{i,j}$} ; %
+    \node[latent, right=of link] (betas) {$\beta_j$} ; %
+    \factor[right=of betas] {group} {below:$\mathcal{N}$} {} {}; %
+    \node[det, above=of group] (Sigma) {$\Sigma$} ; %
+    \factor[right=of Sigma] {Sigma-prior-prod} {below: $\times$} {} {} ; %
+    \node[latent, right=of Sigma-prior-prod, yshift=0.4cm] (Sigma-prior-tau) {$\tau$} ; %
+    \node[latent, right=of Sigma-prior-prod, yshift=-0.4cm] (Sigma-prior-rho) {R} ; %
+    \factor[right=of Sigma-prior-tau] {Sigma-prior-tau-dist} {right:$\mathcal{Cauchy(0, 2.5)}$} {} {} ; %
+    \factor[right=of Sigma-prior-rho] {Sigma-prior-rho-dist} {right: $\mathcal{LKJ(1)}$} {} {}; %
+    \node[latent, right=of group] (beta) {$\beta$} ; %
+    \factor[right=of beta] {beta-prior-dist} {right: $\mathcal{Student(0, 2.5, 3)}$} {} {} ; %
+    \node[obs, right=of X, above=of betas] (grouplevel) {$z_j$} ; %
+    % plates
+    \plate[inner sep=0.12cm, xshift=-0.06cm, yshift=0.06cm] {plate1} {(mu) (distribution) (link) (X) (outcome)} {$N $}; %
+    \plate[inner sep=0.12cm, xshift=-0.06cm, yshift=0.06cm] {plate2} {(mu) (distribution) (link) (betas) (X) (outcome) (grouplevel) (plate1) } {$M $}; %
+    \edge {distribution} {outcome} ; %
+    \edge {mu} {distribution} ; %
+    \edge {link} {mu} ; %
+    \edge {X, betas, grouplevel} {link} ; %
+    \edge {group} {betas} ; %
+    \edge {beta-prior-dist} {beta} ; %
+    \edge {Sigma, beta} {group} ; %
+    \edge {Sigma-prior-prod} {Sigma} ; %
+    \edge {Sigma-prior-tau, Sigma-prior-rho} {Sigma-prior-prod} ; %
+    \edge {Sigma-prior-tau-dist} {Sigma-prior-tau} ; %
+    \edge {Sigma-prior-rho-dist} {Sigma-prior-rho} ; %
+  }
+  \caption{Bayesian Generalized linear mixed model (GLMM) with weakly regularizing priors: a uniform distribution over the correlation matrix of the random effects (R), a Cauchy distribution with location parameter 0 for the standard deviations of the random effects ($\tau$), and a Student $t$ distribution with location 0 for the fixed effects ($\beta$). The split of the variance-covariance matrix of the random effects $\Sigma$ into a correlation matrix and a vector of standard deviations is not strictly necessary but since it is often used in the actual implementation of GLMMs, we follow it here.}
+\end{figure}
 
 ## An example: The Bayesian equivalent of the GLMM in the homework document
 

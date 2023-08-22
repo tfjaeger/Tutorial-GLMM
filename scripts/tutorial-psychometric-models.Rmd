@@ -1116,7 +1116,6 @@ plot_psychometric(model = fit.lambda.mixed)
 ```
 
 ## Visualizing correlations between $\lambda$ and the parameters of the perceptual model
-
 We can also visualize the joint posterior distribution of the model's fixed effect parameters. For example, the following plot visualizes the posterior distribution of the intercept (the average $\alpha$ across the two crowdedness conditions), the slope of stimulus size (the average $\beta$ across the two crowdedness conditions), and $\lambda$. Each point is a single posterior sampel from the model. This reveals a correlation between the three parameters. This is an interactive plot. If you see a message that your browser/device cannot display OpenGL, you might have to compile (knit) this document to HTML (rather than PDF) or go through the code incrementally and then execute just this code chunk. Similar plots could be obtained for any combination of parameters, including the subject-specific estimates of any parameter (\texttt{\url{shinystan::launch_shinystan()}}) provides an interactive HTML graphical user interface that lets you investigate any such correlations; you might know \texttt{R}'s Shiny apps from [webpages like this reporting COVID statistics](https://mappingmonroe.maps.arcgis.com/apps/opsdashboard/index.html#/217749730f174776a3896b3e8950e03b)).
 
 ```{r, message=F, warning=F}
