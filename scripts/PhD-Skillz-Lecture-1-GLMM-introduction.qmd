@@ -1,0 +1,682 @@
+---
+title: "Stronger theories $\\leftrightarrow$ stronger analysis approaches"
+subtitle: "Mixed-effect regression"
+author: T. Florian Jaeger
+email: fjaeger@ur.rochester.edu
+format:
+  revealjs:
+    transition: fade
+    background-transition: fade
+    theme: [night, custom.scss]
+    include-in-header: 
+      text: |
+        <style>
+        .center-xy {
+          margin: 0;
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          -ms-transform: translateY(-50%), translateX(-50%);
+          transform: translateY(-50%), translateX(-50%);
+        }
+        </style>
+editor: visual
+editor_optons:
+  canonical: true
+knitr:
+  opts_chunk: 
+    R.options:
+      width: 200
+---
+
+```{r setup, include=FALSE}
+library("knitr")
+
+knitr::opts_chunk$set(
+  results = "markup", warning = FALSE, cache = TRUE,
+  fig.align = "center", fig.width = 6.5)
+```
+
+```{r libraries, include = F}
+library("tidyverse")  # dplyr, ggplot2, and more from the tidyverse
+library("magrittr")   # pipes
+library("kableExtra") # table formatting
+
+library("MASS")       # sliding difference coding
+library("rstatix")    # ANOVA with defaults that are suitable for psych research
+library("lme4")       # frequentist GLMMs
+library("lmerTest")   # p-values for LMMs with adequate DFs
+
+library("brms")       # Bayesian mixed-effects regression (and more)
+```
+
+```{r constants, include = F}
+theme_set(theme_bw())
+```
+
+## Investing into your data analysis skillz
+
+-   There are many reasons to advance your data analysis skills (though time's finite, and there are many different ways to contribute to science ...)
+
+    -   deeper insights into your data
+    -   increased reproducibility
+    -   increased replicability
+    -   increased power
+    -   ...
+
+\
+
+-   Today, I'll focus on how more advanced analysis approaches---like mixed-effects models---can help us to *test stronger hypotheses* about the *direction* and *relative magnitude* of effects.
+
+## Compare the following research questions / hypotheses
+
+-   "Exposure to an unfamiliar talker *affects* subsequent perception of that talker's speech"
+
+. . .
+
+-   "Exposure to an unfamiliar talker affects *the accuracy of* ..."
+
+. . .
+
+-   "Exposure to an unfamiliar talker *improves* the accuracy of ..."
+
+. . .
+
+-   "Exposure to an unfamiliar talker improves the accuracy of ... *initially quickly, then slowly*"
+
+. . .
+
+-   "Exposure to an unfamiliar talker improves the accuracy of ... *through distributional learning*"
+
+. . .
+
+-   "... through distributional learning that integrates *prior expectations with the statistics of the exposure input*"
+
+-   "... integrates prior expectations *based on previously experienced speech input* with the statistics of the exposure input"
+
+-   "... *ideally* integrates ..."
+
+## Some analyses approaches are primarily suitable for tests of weaker hypotheses
+
+-   "Exposure to an unfamiliar talker *affects* subsequent perception of that talker's speech"
+
+-   "Exposure to an unfamiliar talker affects *the accuracy of* ..."
+
+$\leftarrow$ **These questions can be assessed with methods like ANOVA,** $\chi^2$-tests, etc.
+
+\
+
+. . .
+
+-   These methods---in particular, ANOVA---remain the most common analysis approaches in the psychological sciences.
+
+-   But there are reasons why our fields have moved beyond ANOVA towards GLMMs
+
+## Mixed-effect regression
+
+-   "Exposure to an unfamiliar talker *affects* subsequent perception of that talker's speech"
+
+-   "Exposure to an unfamiliar talker affects *the accuracy of* ..."
+
+-   "Exposure to an unfamiliar talker *improves* the accuracy of ..."
+
+-   "Exposure to an unfamiliar talker improves the accuracy of ... *initially quickly, then slowly*"
+
+$\leftarrow$ **These questions can be assessed with methods like mixed-effect regression.** (the additional questions increasingly require the implementation of cognitive models)
+
+$\leftarrow$ Generalized linear mixed-effects regression allow tests of stronger predictions (stronger = more easily rejectable)
+
+##  
+
+::: center-xy
+**An example**
+:::
+
+## An experiment on adaptive speech perception
+
+```{r, include=T}
+# download.file(
+#   url = "https://github.com/hlplab/constraints-on-distributional-learning-VOT/blob/main/data/experiment-results.csv",
+#   destfile = "../data/Tan-Jaeger.csv")
+
+d <- 
+  read.csv("../data/Tan-Jaeger.csv") %>%
+  # Remove catch trials
+  filter(!is.na(Response.Voicing)) %>%
+  # Some variable typing
+  mutate(
+    across(c(ParticipantID, Block, Condition.Exposure), factor),
+    Response.t = ifelse(Response.Voicing == "voiceless", 1, 0)) 
+```
+
+-   From the abstract of Tan & Jaeger (2024). *Learning to understand an unfamiliar talker*, which forms part of Maryann Tan's doctoral thesis:
+
+    \
+
+    \[...\] a few minutes of exposure can significantly reduce the processing difficulty listeners experience during initial encounters with an unfamiliar accent. How such adaptation unfolds incrementally, however, remains largely unknown, leaving basic predictions by theories of adaptive speech perception untested. This includes questions about how listeners' prior expectations based on lifelong experiences are integrated with the unfamiliar speech input, as well as questions about the speed and success of adaptation. We begin to address these knowledge gaps in a novel incremental exposure-test paradigm. **We expose US English listeners to shifted phonetic distributions of word-initial stops (e.g., "dill" vs. "till"), while incrementally assessing cumulative changes in listeners' perception.** \[...\]
+
+## Research question
+
+-   **Do listeners' categorization functions change in ways predicted by distributional learning models of adaptive speech perception?**
+
+## Design
+
+![An incremental exposure-test design of our experiment. The three *between-participant* conditions (rows) differed in the distribution of voice onset time (VOT) that the single talker during exposure blocks. VOT is the primary cue the contrast between words like "dip" vs. "tip". Test blocks assessed L1-US English listeners' categorization functions over VOT stimuli that were identical within and across conditions.](figures/block_design.png)
+
+## Procedure
+
+-   A simple 2AFC task that yields two types of measures of changes in participants' behavior: **reaction times (RTs)** and **whether participants heard "d" or "t"**.
+
+![Participants started each trial by clicking the green button. A recording played, and **participants had to answer which of the two words they heard**. The placement of response options was counter-balanced across participants.](figures/trial_example.png){width="350px"}
+
+## Participants
+
+-   121 participants were included for analysis, each providing 144 exposure trials (3 blocks) and 72 test trials (6 blocks)
+
+-   For details, see SI of [Tan & Jaeger (2024)](https://osf.io/3kby2)
+
+## Predictions (simplified)
+
+$\rightarrow$ When the VOT distributions of the /d/ and /t/ categories are shifted 'rightwards' along VOT, we expect listeners to also shift their categorization function rightwards:
+
+   + Point of subjective equality (PSE) should shift rightwards
+   + Listeners should be *less* likely to hear the same VOT input as a "t" (and more likely to hear it as a "d").
+
+$\rightarrow$ The *magnitude* of these effects should order: +40 > +10 > +0 condition.
+
+   + If distributional learning leads to linear / proportional shifts in listeners' beliefs about VOT distribution, listeners in +40 condition should shift categorization function 4-times as much as listeners in +10 condition (relative to +0 condition).
+
+![](figures/block_design.png)
+
+
+## Predictions tested in Tan & Jaeger
+
+Predictions of distributional learning models of adaptive speech perception for the incremental adaptation to an unfamiliar talker:
+
+(1) *prior expectations*
+
+    (Kang & Schertz, 2021; Schertz et al., 2016; Tan et al., 2021; Xie et al., 2021)
+
+(2) *exposure amount*
+
+    (Vroomen et al., 2007; Cummings & Theodore, 2023; Kleinschmidt & Jaeger, 2011; Liu & Jaeger, 2018)
+
+(3) *exposure distribution*
+
+    (Chl'adkov'a et al., 2017; Clayards et al., 2008; Colby et al., 2018; Hitczenko & Feldman, 2016; Idemaru & Holt, 2011; Kleinschmidt, 2020; Theodore & Monto, 2019)
+
+(4) *learn to convergence*
+
+(5) *diminishing returns*
+
+
+## Note
+
+-   Against good practices (but for pedagogical reasons):
+
+    -   I do not start by visualizing the results. This helps highlight **what information we do and do not gain from the *analysis*.**
+
+    -   I do not test assumptions (but see, e.g., [tests of assumptions of ANOVA](https://www.datanovia.com/en/lessons/mixed-anova-in-r/#two-way-mixed))
+
+## ANOVA: Does manipulation affect behavior?
+
+-   We can't directly test the strong *directional* prediction of distributional learning theories.
+-   ANOVA only allows us to ask the type of *theoretically weak* research question that remains the most common in the psychological sciences
+
+\
+
+-   E.g., we can ask: **is the distribution of the outcome independent of the predictor variables we manipulated?**
+
+## Does exposure *affect* the speed of perception?
+
+-   We compare (log-transformed) RTs between the three conditions.
+-   To compare apples-and-apples, we only use data from test blocks (same VOTs across conditions)
+
+```{r, echo=T}
+#| code-fold: true
+#| code-summary: "expand for full code"
+#| fig-align: "center"
+
+# For repeated measures data, we first aggregate it down to one data point per condition per participant.
+d.agg <-
+  d %>%
+  filter(Phase == "test") %>%
+  group_by(Condition.Exposure, ParticipantID) %>%
+  summarise(across(Response.RT, ~ mean(log(.x)))) %>%
+  ungroup()
+
+# One-way (between-subject) ANOVA
+anova_test(
+  formula = Response.RT ~ Condition.Exposure,
+  type = "III",
+  data = d.agg)
+```
+
+. . .
+
+-   The three conditions do not seem to differ in terms of the distribution of RTs. But perhaps that's because we included all trials? Perhaps differences need time to emerge during exposure?
+
+::: notes
+*ges* corresponds to the generalized eta squared (effect size). It measures the proportion of the variability in the outcome variable that can be explained in terms of the predictor. An effect size of 0.1 (10%) means that 10% of the change in the (log) RTs can be accounted for by changes across blocks.
+:::
+
+## Does exposure *affect* the speed of perception (across blocks)?
+
+```{r, echo=T}
+#| code-fold: true
+#| code-summary: "expand for full code"
+#| fig-align: "center"
+d.agg <-
+  d %>%
+  filter(Phase == "test") %>%
+  group_by(Condition.Exposure, Block, ParticipantID) %>%
+  summarise(across(Response.RT, ~ mean(log(.x)))) %>%
+  ungroup()
+
+# Mixed ANOVA with one between-subject (exposure condition)
+# and one within-subject (block) variable
+AOV <- 
+  anova_test(
+    dv = Response.RT,
+    wid = ParticipantID, within = Block, between = Condition.Exposure,
+    type = "III",
+    data = d.agg)
+
+# By default, automatically applies sphericity corrections
+get_anova_table(AOV)
+```
+
+. . .
+
+-   RTs seem to change across blocks, but do not differ across exposure conditions.
+
+## ANOVA: Limitations I
+
+-   Limited to specific types of outcomes and predictors:
+
+    -   Continuous *outcomes* & categorical *predictors* (factors)
+    -   Assumes normality & homogeneity (or at least homoscedasticity) of variances $\rightarrow$ we should not analyze participants' categorization responses with ANOVA
+
+-   Without additional post-hoc tests, does *not* test:
+
+    -   *direction* of effects
+    -   *magnitude* of effects (and thus neither)
+    -   *order* of effects for predictors with more than one level
+    -   *shape* of effects (linear, exponential, ...)
+
+    $\rightarrow$ hence, the limitation to theoretically weak research questions!
+
+## ANOVA: Limitations II
+
+-   By requiring **aggregation** for repeated-measures data, we lose information.
+
+    -   can *increase the risk of spurious effects* for unbalanced data (Type I error)
+    -   can *reduce power*
+    -   only allows one random effect at a time $\rightarrow$ is inherently deficient when we aim to generalize our conclusions across multiple grouping factors (e.g., participants *and* items)
+
+## Generalized linear mixed-effects models (GLMMs)
+
+-   GLMMs address most of these shortcomings of ANOVA
+
+\
+
+-   Let's briefly replicate the above ANOVA in an LMM
+
+```{r, echo=F}
+# Sliding difference coding for exposure condition and block
+# (we again subset the data to only the test blocks; droplevels() removes
+# the factor levels of the exposure blocks from the Block variable)
+d.test <- 
+  d %>% 
+  filter(Phase == "test") %>%
+  droplevels()
+
+contrasts(d.test$Condition.Exposure) <- 
+  cbind(
+    "+10 vs. +0" = c(-2/3, 1/3, 1/3),
+    "+40 vs. +10" = c(-1/3, -1/3, 2/3))
+
+contrasts(d.test$Block) <- contr.sdif(6) / 2
+```
+
+```{r, echo=T}
+#| code-fold: true
+#| code-summary: "expand for full code"
+#| fig-align: "center"
+
+# LMM over *trial-level* data with appropriate random
+# (random slopes for all, and only, *within*-subject manipulations)
+LMM <- 
+  lmer(
+    formula = log(Response.RT) ~ 1 + Condition.Exposure * Block + (1 + Block | ParticipantID),
+    data = d.test,
+    REML = F)
+
+anova(LMM)
+```
+
+\
+
+. . .
+
+-   Qualitatively replicates mixed ANOVA (not quite identical because different corrections were applied to DFs and we are now using *trial*-level data $\leftarrow$ no aggregation)
+
+## Coding hypotheses
+
+-   Unlike ANOVA, however, the underlying LMM already tested directional hypotheses. Specifically, I used *sliding-difference* coding for both the exposure condition and blocks.
+
+```{r, echo=T, eval=F}
+# Manually coding the sliding-difference contrast for exposure condition
+contrasts(d.test$Condition.Exposure) <- 
+  cbind(
+    "+10 vs. +0" = c(-2/3, 1/3, 1/3),
+    "+40 vs. +10" = c(-1/3, -1/3, 2/3))
+
+# For the six levels of block, the above approach would be a lot of typing
+# Conveniently, MASS::contr.sdif() sets up sliding-difference coding.
+contrasts(d.test$Block) <- contr.sdif(6)
+```
+
+-   This makes it possible to test *directional* hypotheses, and hypothesis about the *ordering* of conditions
+
+    $\rightarrow$ **test of *stronger theories***
+
+-   I'll return to the importance of that in a few slides, but first let's see what that I means
+
+## What does factor coding do?
+
+-   Contrasts are matrices that define how the levels of an input factor are translated into the numerical predictor columns that enter the regression:
+
+```{r}
+#| code-fold: true
+#| code-summary: "expand for full code"
+#| fig-align: "center"
+
+contrasts(d.test$Condition.Exposure) 
+```
+
+-   Everytime you run a regression, factors are quietly translated into numerical columns. We can look at the model matrix that results from this. This is the matrix $X$, often referred to in regression textbooks (e.g., when we read $\hat{y} = X\beta$):
+
+```{r}
+#| code-fold: true
+#| code-summary: "expand for full code"
+#| fig-align: "center"
+
+d.test %>%
+  select(ParticipantID, Condition.Exposure) %>%
+  bind_cols(
+    model.matrix(~ 1 + Condition.Exposure, data = d.test) %>%
+      as_tibble()) %>%
+  distinct() %>%
+  head(10)
+```
+
+## Linear mixed-effects regression: Results
+
+```{r, results="asis"}
+kable(summary(LMM)$coef, format = "html", digits = 3) %>%
+  kable_styling(font_size = 16)
+```
+
+-   What do we gain from this output? Do you see trends in the data that were not apparent in the ANOVA?
+
+## Linear mixed-effects regression: Results
+
+```{r, results="asis"}
+summary(LMM)$coef %>%
+  as.data.frame() %>%
+  mutate(Estimate = cell_spec(round(Estimate, 3), align = "r", color = "white", background = ifelse(Estimate > 0, "orange", "blue"))) %>%
+  kable(format = "html", escape = F, digits = 3) %>%
+  kable_styling(font_size = 16) %>%
+  column_spec(6, bold = ifelse(summary(LMM)$coef[,5] < .1, T, F))
+```
+
+## Testing different hypothesis: Helmert coding
+
+```{r}
+#| code-fold: true
+#| code-summary: "expand for full code"
+#| fig-align: "center"
+
+# Manually coding Helmert contrast for exposure condition
+contrasts(d.test$Condition.Exposure) <- 
+  cbind(
+    "+10 vs. +0" = c(-1/2, 1/2, 0),
+    "+40 vs. mean(+0, +10)" = c(-1/3, -1/3, 2/3))
+
+# For the six levels of block, the above approach would be a lot of typing
+# Conveniently, contr.helmert() sets up Helmert coding.
+contrasts(d.test$Block) <- contr.helmert(6) * matrix(rep(c(1/2, 1/3, 1/4, 1/5, 1/6), 5), byrow = T, nrow = 6)
+colnames(contrasts(d.test$Block)) <- c("2-1", "3-mean(1:2)", "4-mean(1:3)", "5-mean(1:4)", "6-mean(1:5)")
+
+LMM %<>% update()
+```
+
+```{r, results="asis"}
+summary(LMM)$coef %>%
+  as.data.frame() %>%
+  mutate(Estimate = cell_spec(round(Estimate, 3), align = "r", color = "white", background = ifelse(Estimate > 0, "orange", "blue"))) %>%
+  kable(format = "html", escape = F, digits = 3) %>%
+  kable_styling(font_size = 16) %>%
+  column_spec(6, bold = ifelse(summary(LMM)$coef[,5] < .1, T, F))
+```
+
+-   Helmert coding tests a weaker ordering hypothesis, comparing each condition against the mean of the preceding conditions.
+
+## Testing different hypothesis: Effect coding
+
+```{r}
+#| code-fold: true
+#| code-summary: "expand for full code"
+#| fig-align: "center"
+
+# Manually coding effect contrast for exposure condition
+# (not dividing this through 2, so that the coef is the distance to the mean,
+# just as the coef before was the distance between the different conditions)
+contrasts(d.test$Condition.Exposure) <- 
+  cbind(
+    "+10 vs. mean(+0,+10,+40)" = c(-1, 1, 0),
+    "+40 vs. mean(+0,+10,+40)" = c(-1, 0, 1/2))
+
+# For the six levels of block, the above approach would be a lot of typing
+# Conveniently, contr.sum() sets up effect coding.
+# (not dividing this through 2, so that the coef is the distance to the mean,
+# just as the coef before was the distance between the different conditions)
+contrasts(d.test$Block) <- contr.sum(6) 
+colnames(contrasts(d.test$Block)) <- paste(as.character(1:5), "-mean(1:6)", sep = "")
+
+LMM %<>% update()
+```
+
+```{r, results="asis"}
+summary(LMM)$coef %>%
+  as.data.frame() %>%
+  mutate(Estimate = cell_spec(round(Estimate, 3), align = "r", color = "white", background = ifelse(Estimate > 0, "orange", "blue"))) %>%
+  kable(format = "html", escape = F, digits = 3) %>%
+  kable_styling(font_size = 16) %>%
+  column_spec(6, bold = ifelse(summary(LMM)$coef[,5] < .1, T, F))
+```
+
+-   Effect coding tests compares each condition against the mean of all conditions.
+-   For more, see this nice [tutorial on factor coding by Marissa Barlaz](https://marissabarlaz.github.io/portfolio/contrastcoding/)
+
+## GLMMs: Beyond normally distributed outcomes
+
+-   One important advantage of GLMMs is that we can analyze outcomes that have non-normal distributions. E.g., we can now in good conscience analyze participants' categorization responses (whether they heard "d" or "t"):
+
+```{r, echo=T}
+#| code-fold: true
+#| code-summary: "expand for full code"
+#| fig-align: "center"
+
+# Setting up sliding-difference coding again
+contrasts(d.test$Condition.Exposure) <- 
+  cbind(
+    "+10 vs. +0" = c(-2/3, 1/3, 1/3),
+    "+40 vs. +10" = c(-1/3, -1/3, 2/3))
+contrasts(d.test$Block) <- contr.sdif(6)
+
+GLMM <- 
+  glmer(
+    formula = Response.t  ~ 1 + Condition.Exposure * Block + (1 + Block | ParticipantID),
+    family = binomial(link = "logit"),
+    data = d.test)
+```
+
+## Mixed-effect logistic regression: Results
+
+```{r, results="asis"}
+summary(GLMM)$coef %>%
+  as.data.frame() %>%
+  mutate(Estimate = cell_spec(round(Estimate, 3), align = "r", color = "white", background = ifelse(Estimate > 0, "orange", "blue"))) %>%
+  kable(format = "html", escape = F, digits = 3) %>%
+  kable_styling(font_size = 16) %>%
+  column_spec(5, bold = ifelse(summary(GLMM)$coef[,4] < .1, T, F))
+```
+
+. . .
+
+-   What do these results mean? Do they support our predictions?
+
+## Visualizing results I
+
+```{r}
+d.test %>%
+  group_by(Condition.Exposure, ParticipantID) %>%
+  summarise(across(Response.t, mean)) %>%
+  ggplot(aes(x = Condition.Exposure, y = Response.t, color = Condition.Exposure)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "pointrange") +
+  scale_x_discrete("Exposure condition") +
+  scale_y_continuous("Proportion 't'-responses") +
+  theme(legend.position = "none")
+```
+
+-   But the interactions are still quite difficult to understand.
+
+## "Simple slopes" analyses
+
+-   To understand interactions, researchers analyze **separate subsets** of the data:
+
+    -   can reduce power
+    -   can change assumptions relative to the main analysis (e.g., due to homoscedasticity assumption)
+
+-   **Visualizations** are helpful but typically leave open how much evidence we have for the effects (or use, e.g., CIs that are obtained in different ways than in the analysis).
+
+. . .
+
+-   **Simple slopes** analyses provide a powerful and convenient alternative:
+
+    -   use all data
+    -   use same factor coding as in main analysis
+
+-   **Pairwise comparisons** (e.g., using packages like *emmeans*) can be used in similar ways
+
+## Effects of exposure in each block {.scrollable}
+
+```{r, echo=T}
+#| code-fold: true
+#| code-summary: "expand for full code"
+#| fig-align: "center"
+
+GLMM <- 
+  glmer(
+    formula = Response.t  ~ 0 + Block / Condition.Exposure + (0 + Block | ParticipantID),
+    family = binomial(link = "logit"),
+    data = d.test)
+```
+
+```{r, results="asis"}
+summary(GLMM)$coef %>%
+  as.data.frame() %>%
+  mutate(Estimate = cell_spec(round(Estimate, 3), align = "r", color = "white", background = ifelse(Estimate > 0, "orange", "blue"))) %>%
+  kable(format = "html", escape = F, digits = 3) %>%
+  kable_styling(font_size = 16) %>%
+  pack_rows("Mean (log-odds) of 't'-responses for each block (across conditions)", 1, 6) %>%
+  pack_rows("Effects of exposure conditions for each block", 7, 18) %>%
+  column_spec(5, bold = ifelse(summary(GLMM)$coef[,4] < .1, T, F))
+```
+
+## Effects of block in each exposure condition {.scrollable}
+
+```{r, echo=T}
+#| code-fold: true
+#| code-summary: "expand for full code"
+#| fig-align: "center"
+
+GLMM <- 
+  glmer(
+    formula = Response.t  ~ 0 + Condition.Exposure / Block + (0 + Block | ParticipantID),
+    family = binomial(link = "logit"),
+    data = d.test)
+```
+
+```{r, results="asis"}
+s <- summary(GLMM)$coef[c(1:3, c(4, 7, 10, 13, 16), c(5, 8, 11, 14, 17), c(6, 9, 12, 15, 18)),] 
+
+s %>%
+  as.data.frame() %>%
+  mutate(Estimate = cell_spec(round(Estimate, 3), align = "r", color = "white", background = ifelse(Estimate > 0, "orange", "blue"))) %>%
+  kable(format = "html", escape = F, digits = 3) %>%
+  kable_styling(font_size = 16) %>%
+  pack_rows("Mean (log-odds) of 't'-responses for each condition (across block)", 1, 3) %>%
+  pack_rows("Changes across blocks in +0 shift condition", 4, 8) %>%
+  pack_rows("Changes across blocks in +10 shift condition", 9, 13) %>%
+  pack_rows("Changes across blocks in +40 shift condition", 14, 18) %>%
+  column_spec(5, bold = ifelse(s[,4] < .1, T, F))
+```
+
+## Interpretation of results
+
+-   When the exposure distribution is shifted rightwards:
+
+    -   proportion of "t"-responses over the test items (which are identical across conditions) decreases $\rightarrow$ participants perceive fewer tokens as "t", and more tokens as "d"
+
+    -   this effect emerges very quickly (from test block 1 to 2, i.e., after the first exposure block)
+
+    -   after that, changes flatten off
+
+-   When testing continues after no further exposure is provided:
+
+    -   Some of the changes induced by exposure are undone.
+
+## Visualizing results II
+
+```{r}
+d.test %>%
+  group_by(Condition.Exposure, Block, ParticipantID) %>%
+  summarise(across(Response.t, mean)) %>%
+  ggplot(aes(x = as.numeric(as.character(Block)), y = Response.t, color = Condition.Exposure)) +
+  stat_summary(fun.y = mean, geom = "line", aes(group = Condition.Exposure), position = position_dodge(.2)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "pointrange", position = position_dodge(.2)) +
+  scale_x_continuous("Test block", breaks = c(1, 3, 5, 7, 8, 9)) +
+  scale_y_continuous("Proportion 't'-responses") +
+  scale_color_discrete("Exposure condition") +
+  theme(legend.position = "top")
+```
+
+## Visualizing results III
+
+```{r}
+d.test %>%
+  group_by(Condition.Exposure, Block, Item.VOT, ParticipantID) %>%
+  summarise(across(Response.t, mean)) %>%
+  ungroup() %>%
+  ggplot(aes(x = Item.VOT, y = Response.t, color = Condition.Exposure)) +
+  stat_summary(fun.y = mean, geom = "line", aes(group = Condition.Exposure), position = position_dodge(.2)) +
+  geom_smooth(
+    data = 
+      . %>%
+      filter(Block == 1) %>%
+      select(-Block) %>%
+      crossing(Block = c(1, 3, 5, 7, 8, 9)),
+    mapping = aes(x = Item.VOT, y = Response.t),
+    color = "black", linetype = 2, linewidth = .5,
+    inherit.aes = F, se = F) +
+  stat_summary(fun.data = mean_cl_boot, geom = "pointrange", position = position_dodge(.2)) +
+  scale_x_continuous("VOT (ms)") +
+  scale_y_continuous("Proportion 't'-responses") +
+  scale_color_discrete("Exposure condition") +
+facet_wrap(~ as.numeric(as.character(Block))) +
+  theme(legend.position = "top")
+```
+

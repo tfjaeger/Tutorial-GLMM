@@ -1,0 +1,448 @@
+---
+title: "Stronger theories $\\leftrightarrow$ stronger analysis approaches"
+subtitle: "Bayesian mixed-effect regression"
+author: T. Florian Jaeger
+email: fjaeger@ur.rochester.edu
+format:
+  revealjs:
+    transition: fade
+    background-transition: fade
+    theme: [night, custom.scss]
+    include-in-header: 
+      text: |
+        <style>
+        .center-xy {
+          margin: 0;
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          -ms-transform: translateY(-50%), translateX(-50%);
+          transform: translateY(-50%), translateX(-50%);
+        }
+        </style>
+editor: visual
+editor_optons:
+  canonical: true
+knitr:
+  opts_chunk: 
+    R.options:
+      width: 200
+---
+
+```{r setup, include=FALSE}
+library("knitr")
+
+knitr::opts_chunk$set(
+  results = "markup", warning = FALSE, cache = TRUE,
+  fig.align = "center", fig.width = 6.5)
+```
+
+```{r libraries, include = F}
+library("tidyverse")  # dplyr, ggplot2, and more from the tidyverse
+library("magrittr")   # pipes
+
+library("kableExtra") # table formatting
+
+library("brms")       # Bayesian mixed-effects regression (and more)
+```
+
+```{r constants, include = F}
+theme_set(theme_bw())
+```
+
+## Recall: An experiment on adaptive speech perception
+
+```{r, include=T}
+d <- 
+  read.csv("../data/Tan-Jaeger.csv") %>%
+  # Remove catch trials
+  filter(!is.na(Response.Voicing)) %>%
+  # Some variable typing
+  mutate(
+    across(c(ParticipantID, Block, Condition.Exposure), factor),
+    Response.t = ifelse(Response.Voicing == "voiceless", 1, 0)) 
+
+d.test <- 
+  d %>% 
+  filter(Phase == "test") %>%
+  droplevels()
+```
+
+![An incremental exposure-test design of our experiment. The three *between-participant* conditions (rows) differed in the distribution of voice onset time (VOT) that the single talker during exposure blocks. VOT is the primary cue the contrast between words like "dip" vs. "tip". Test blocks assessed L1-US English listeners' categorization functions over VOT stimuli that were identical within and across conditions.](figures/block_design.png)
+
+
+
+## Research question
+
+- **Do listeners' categorization functions change in ways predicted by distributional learning models of adaptive speech perception?**
+
+## Predictions (simplified)
+
+$\rightarrow$ When the VOT distributions of the /d/ and /t/ categories are shifted 'rightwards' along VOT, we expect listeners to also shift their categorization function rightwards.
+
+$\rightarrow$ Listeners should be *less* likely to hear the same VOT input as a "t" (and more likely to hear it as a "d"). This prediction can be assessed on the test blocks.
+
+
+## Visualizing results II
+
+```{r}
+d.test %>%
+  group_by(Condition.Exposure, Block, ParticipantID) %>%
+  summarise(across(Response.t, mean)) %>%
+  ggplot(aes(x = as.numeric(as.character(Block)), y = Response.t, color = Condition.Exposure)) +
+  stat_summary(fun.y = mean, geom = "line", aes(group = Condition.Exposure), position = position_dodge(.2)) +
+  stat_summary(fun.data = mean_cl_boot, geom = "pointrange", position = position_dodge(.2)) +
+  scale_x_continuous("Test block", breaks = c(1, 3, 5, 7, 8, 9)) +
+  scale_y_continuous("Proportion 't'-responses") +
+  scale_color_discrete("Exposure condition") +
+  theme(legend.position = "top")
+```
+
+## Visualizing results III
+
+```{r}
+d.test %>%
+  group_by(Condition.Exposure, Block, Item.VOT, ParticipantID) %>%
+  summarise(across(Response.t, mean)) %>%
+  ungroup() %>%
+  ggplot(aes(x = Item.VOT, y = Response.t, color = Condition.Exposure)) +
+  stat_summary(fun.y = mean, geom = "line", aes(group = Condition.Exposure), position = position_dodge(.2)) +
+  geom_smooth(
+    data = 
+      . %>%
+      filter(Block == 1) %>%
+      select(-Block) %>%
+      crossing(Block = c(1, 3, 5, 7, 8, 9)),
+    mapping = aes(x = Item.VOT, y = Response.t),
+    color = "black", linetype = 2, linewidth = .5,
+    inherit.aes = F, se = F) +
+  stat_summary(fun.data = mean_cl_boot, geom = "pointrange", position = position_dodge(.2)) +
+  scale_x_continuous("VOT (ms)") +
+  scale_y_continuous("Proportion 't'-responses") +
+  scale_color_discrete("Exposure condition") +
+facet_wrap(~ as.numeric(as.character(Block))) +
+  theme(legend.position = "top")
+```
+
+## Predictions tested in Tan & Jaeger
+
+Predictions of distributional learning models of adaptive speech perception for the incremental adaptation to an unfamiliar talker:
+
+(1) *prior expectations*
+
+    (Kang & Schertz, 2021; Schertz et al., 2016; Tan et al., 2021; Xie et al., 2021)
+
+(2) *exposure amount*
+
+    (Vroomen et al., 2007; Cummings & Theodore, 2023; Kleinschmidt & Jaeger, 2011; Liu & Jaeger, 2018)
+
+(3) *exposure distribution*
+
+    (Chl'adkov'a et al., 2017; Clayards et al., 2008; Colby et al., 2018; Hitczenko & Feldman, 2016; Idemaru & Holt, 2011; Kleinschmidt, 2020; Theodore & Monto, 2019)
+
+(4) *learn to convergence*
+
+(5) *diminishing returns*
+
+
+## Bayesian mixed-effects regression: What changes?
+
+- What do we need to add to fit a *Bayesian* version of the model discussed in the previous session? **Priors on all effects (coefficients)**
+
+- What changes in the fitting of the model? ***Sampling-based methods* are used to obtain samples from the (approximated) posterior distribution of the effects** $\rightarrow$ Warnings & error messages changes (e.g., in R for packages using `rstan`: "low ESS", "large Rhats", "divergent transitions after warm-up")
+
+- What changes in the output of the model? **Posterior *distribution* of effects (rather than point estimates)** $\rightarrow$ "credible interval" instead of "confidence intervals", no $p$-values (but BFs) and hence no dichotomy (but "anecdotal", "moderate", "decisive/strong", "very strong" evidence) 
+
+ $\rightarrow$ need to acquire different terminology for reporting.
+
+
+## Bayesian mixed-effects  regression: What remains the same?
+
+- Interpretation of coefficients/effects, and its dependence on factor coding
+
+- Similar output formatting
+
+
+## \
+
+::: {.center-xy}
+
+**An example**
+
+:::
+
+
+## Setting priors
+
+- Code factors (and scale continuous predictors, but we don't have any in the model). We again go with sliding-difference coding since it directly encodes the predictions we're interested in.
+
+```{r, echo=T}
+#| code-fold: true
+#| code-summary: "expand for full code"
+#| fig-align: "center"
+
+# Manually coding the sliding-difference contrast for exposure condition
+contrasts(d.test$Condition.Exposure) <- 
+  cbind(
+    "+10 vs. +0" = c(-2/3, 1/3, 1/3),
+    "+40 vs. +10" = c(-1/3, -1/3, 2/3))
+
+# For the six levels of block, the above approach would be a lot of typing
+# Conveniently, MASS::contr.sdif() sets up sliding-difference coding.
+contrasts(d.test$Block) <- MASS::contr.sdif(6)
+```
+
+- Since we have no specific prior expectations about the effects, we define **weakly regularizing priors** for all parameters (specifically, following [recommendations by Aki Vehtari](https://github.com/stan-dev/stan/wiki/Prior-Choice-Recommendations))
+
+```{r, echo=T}
+my_priors <-
+  c(
+    # weakly regularizing prior for fixed effects
+    # (assumes that all continuous predictors have been scaled to have SD = .5, 
+    # by dividing by twice their original SD)
+    prior(student_t(3, 0, 2.5), class = "b"),
+    # weakly regularizing prior on the standard deviations of the random effects
+    # (needed when model has random effects)
+    prior(cauchy(0, 2.5), class = "sd"),
+    # uniform prior over correlation matrix of the random effects
+    # (needed when model includes covariances of random effects, e.g.,, when | 
+    # instead of || is used in combination with random slopes)
+    # (https://en.wikipedia.org/wiki/Lewandowski-Kurowicka-Joe_distribution)
+    prior(lkj(1), class = "cor"))
+```
+
+## Fitting
+
+```{r, echo=T}
+GLMM <- 
+  brm(
+    formula = Response.t  ~ 1 + Condition.Exposure * Block + (1 + Block | ParticipantID),
+    # brms is a bit more nitpicky / accurate in the specification of the 
+    # assumed outcome distribution. Since we're predicting trial-level 
+    # responses ("d" or "t"), we're assuming that the outcome has a 
+    # Bernoulli distribution (binomial is also possible, but requires 
+    # a different specification, see ?brmsfamily)
+    family = bernoulli(link = "logit"),
+    data = d.test,
+    prior = my_priors,
+    # arguments that determine the number of warmup and posterior samples
+    iter = 2000, warmup = 1000, chains = 4,
+    # arguments that determine how the model is fit
+    cores = 4, threads = threading(2), control = list(adapt_delta = .85),
+    # store the model, so that next time this is called the model is just 
+    # loaded from the file
+    file = "../models/Bayesian-GLMM-example", file_refit = "on_change", 
+    # Save stan code in text file (helpful if you'd like to understand the
+    # underlying model structure, and/or want to understand how to code 
+    # Bayesian models in R, including models not included in brms)
+    save_model = "../models/Bayesian-GLMM-example.stan")
+```
+
+
+## Diagnostics
+
+- No obvious issues during model fitting: **no divergent transitions** after warm-up, no **large $\hat{R} 1 \leq 1.01$** (within- and across-chain correlations of posterior samples are similar), and **reasonable effective sample sizes** (ESSs $\geq 1000$).
+
+- **Posterior predictive check** is not particularly helpful for an analysis with a binary outcome: 
+
+```{r}
+#| code-fold: true
+#| code-summary: "expand for full code"
+#| fig-align: "center"
+
+pp_check(
+  GLMM, 
+  type = "bars_grouped", 
+  group = "Condition.Exposure",
+  nsamples = 200)
+```
+
+- `shinystan::launch_shinystan()` offers a wide variety of diagnostic and other tools to explore the fitted model.
+
+- There are many articles on "Bayesian workflow"s, often including specialized R libraries. A very thorough but still accessible introduction towards a [principled Bayesian workflow for the psychological sciences](https://psycnet.apa.org/record/2020-43606-001) can be found in Schad, Betancourt, & Vasishth (2021).
+
+
+## Result summary {.scrollable}
+
+```{r, echo=T}
+#| code-fold: true
+#| code-summary: "expand for full code"
+#| fig-align: "center"
+
+summary(GLMM, priors = T)
+```
+
+## Default visualization of regression fit {.scrollable}
+
+- Plot posterior draws of the expected value of the posterior predictive distribution, conditional on predictor values. 
+
+```{r, echo=T}
+#| code-fold: true
+#| code-summary: "expand for full code"
+#| fig-align: "center"
+
+conditional_effects(
+  GLMM, 
+  # Without (NA) or with group-level (= 'random') effects 
+  re_formula = NA, 
+  # Plot predictions in response space ("epred", here: proportions)
+  # in the space of the linear predictor ("linpred", here: log-odds)
+  # or plot posterior predictive ("predict", which includes residual variance)
+  method = "posterior_epred",
+  robust = T,
+  prob = .95) %>%
+  plot(
+    theme = theme_bw(),
+    plot = F, ask = F) %>%
+  map(~ .x + scale_color_ordinal() + ylab('Proportion "t"-responses"') + ylim(0, 1))
+```
+
+## Default visualization of regression fit {.scrollable}
+
+- The same but while including random effect uncertainty:
+
+```{r, echo=T}
+#| code-fold: true
+#| code-summary: "expand for full code"
+#| fig-align: "center"
+
+conditional_effects(
+  GLMM, 
+  effects = "Condition.Exposure:Block",
+  # Without (NA) or with group-level (= 'random') effects 
+  re_formula = NULL, 
+  # Plot predictions in response space ("epred", here: proportions)
+  # in the space of the linear predictor ("linpred", here: log-odds)
+  # or plot posterior predictive ("predict", which includes residual variance)
+  method = "posterior_epred",
+  robust = T,
+  prob = .95) %>%
+  plot(
+    theme = theme_bw(),
+    plot = F, ask = F) %>%
+  map(~ .x + scale_color_ordinal() + ylab('Proportion "t"-responses"') + ylim(0, 1))
+```
+
+## Default visualization of regression fit (posterior predictive) {.scrollable}
+
+- The same but while also include residual uncertainty:
+
+```{r, echo=T}
+#| code-fold: true
+#| code-summary: "expand for full code"
+#| fig-align: "center"
+
+conditional_effects(
+  GLMM, 
+  effects = "Condition.Exposure:Block",
+  # Without (NA) or with group-level (= 'random') effects 
+  re_formula = NA, 
+  # Plot predictions in response space ("epred", here: proportions)
+  # in the space of the linear predictor ("linpred", here: log-odds)
+  # or plot posterior predictive ("predict", which includes residual variance)
+  method = "posterior_predict",
+  robust = F,
+  prob = .95) %>%
+  plot(
+    theme = theme_bw(),
+    plot = F, ask = F) %>%
+  map(~ .x + scale_color_ordinal() + ylab('Proportion "t"-responses"') + ylim(0, 1))
+```
+
+## Default visualization of regression fit (linear predictor) {.scrollable}
+
+- The linear predictor (in log-odds) without the additional sources of uncertainty:
+
+```{r, echo=T}
+#| code-fold: true
+#| code-summary: "expand for full code"
+#| fig-align: "center"
+
+conditional_effects(
+  GLMM, 
+  effects = "Condition.Exposure:Block",
+  # Without (NA) or with group-level (= 'random') effects 
+  re_formula = NA, 
+  # Plot predictions in response space ("epred", here: proportions)
+  # in the space of the linear predictor ("linpred", here: log-odds)
+  # or plot posterior predictive ("predict", which includes residual variance)
+  method = "posterior_linpred",
+  prob = .95) %>%
+  plot(
+    theme = theme_bw(),
+    plot = F, ask = F) %>%
+  map(~ .x + scale_color_ordinal() + ylab('log-odds "t"-responses"'))
+```
+
+
+# Hypothesis tests
+
+- We can query the fitted regression model with Bayesian hypothesis tests. There are many ways to do so. One convenient approach that provides a lot of flexibility is the `brms::hypothesis()` function.
+
+- E.g., we can ask the model "Do subjects in the +10 condition respond "t" less often than subjects in the +0 condition?" (as expected if they have shifted their categorization function 'rightwards'). By default, the `hypothesis()` function will conduct a one-sided hypothesis test for such a *directional* hypothesis:
+
+```{r}
+#| code-fold: true
+#| code-summary: "expand for full code"
+#| fig-align: "center"
+
+hypothesis(
+  GLMM,
+  "Condition.ExposureP10vs.P0 < 0", 
+  class = "b", scope = "standard")
+```
+
+
+# Hypothesis tests
+
+- One convenient aspect of this function is that we can test hypotheses that are not directly accessible from the summary output---e.g., "Do subjects in the +10 condition respond "t" less often than subjects in the +0 condition?" 
+
+- Recall that we have no contrast in our model that directly compares the +40 to the +0 condition). But since the two sliding-difference coded contrasts describe the difference between the mean of the +10 vs. the +0 condition and the mean of the +40 and +10 condition, we can ask whether the *sum* of these differences is smaller 0:
+
+```{r}
+#| code-fold: true
+#| code-summary: "expand for full code"
+#| fig-align: "center"
+
+hypothesis(
+  GLMM,
+  "Condition.ExposureP10vs.P0 + Condition.ExposureP40vs.P10< 0", 
+  class = "b", scope = "standard")
+```
+
+
+# Hypothesis tests
+
+- We can even test more complex hypotheses---e.g., whether the difference between the +40 and +10 condition is *proportionally less* than the difference between the +10 and the +0 condition:  
+
+```{r}
+#| code-fold: true
+#| code-summary: "expand for full code"
+#| fig-align: "center"
+
+hypothesis(
+  GLMM,
+  "Condition.ExposureP40vs.P10 < Condition.ExposureP10vs.P0 * 3", 
+  class = "b", scope = "standard")
+```
+
+
+# Hypothesis tests
+
+- The same function makes it trivial to test hypotheses for individual participants (or items, or other grouping factors)---e.g., for participants' changes from Block 1 to 2:
+
+```{r}
+#| code-fold: true
+#| code-summary: "expand for full code"
+#| fig-align: "center"
+
+hypothesis(
+  GLMM,
+  "Block2M1 < 0", 
+  # scope "coef" assesses the hypothesis for each level of the group variable
+  # scope "ranef" instead assesses whether each level of the group variable
+  # differs from 0 (and thus from the overall, population-level/'fixed' effect).
+  # This latter approach makes it possible to test whether there are credible 
+  # individual differences between participants.
+  class = "b", scope = "coef", group = "ParticipantID")
+```
