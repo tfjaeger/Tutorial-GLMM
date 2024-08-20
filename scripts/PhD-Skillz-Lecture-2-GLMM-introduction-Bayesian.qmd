@@ -381,7 +381,7 @@ conditional_effects(
 
 - E.g., we can ask the model "Do subjects in the +10 condition respond "t" less often than subjects in the +0 condition?" (as expected if they have shifted their categorization function 'rightwards'). By default, the `hypothesis()` function will conduct a one-sided hypothesis test for such a *directional* hypothesis:
 
-```{r}
+```{r, echo=T}
 #| code-fold: true
 #| code-summary: "expand for full code"
 #| fig-align: "center"
@@ -399,7 +399,7 @@ hypothesis(
 
 - Recall that we have no contrast in our model that directly compares the +40 to the +0 condition). But since the two sliding-difference coded contrasts describe the difference between the mean of the +10 vs. the +0 condition and the mean of the +40 and +10 condition, we can ask whether the *sum* of these differences is smaller 0:
 
-```{r}
+```{r, echo=T}
 #| code-fold: true
 #| code-summary: "expand for full code"
 #| fig-align: "center"
@@ -415,7 +415,7 @@ hypothesis(
 
 - We can even test more complex hypotheses---e.g., whether the difference between the +40 and +10 condition is *proportionally less* than the difference between the +10 and the +0 condition:  
 
-```{r}
+```{r, echo=T}
 #| code-fold: true
 #| code-summary: "expand for full code"
 #| fig-align: "center"
@@ -431,7 +431,7 @@ hypothesis(
 
 - The same function makes it trivial to test hypotheses for individual participants (or items, or other grouping factors)---e.g., for participants' changes from Block 1 to 2:
 
-```{r}
+```{r, echo=T}
 #| code-fold: true
 #| code-summary: "expand for full code"
 #| fig-align: "center"
