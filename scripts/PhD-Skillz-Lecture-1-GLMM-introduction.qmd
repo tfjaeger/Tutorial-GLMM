@@ -161,7 +161,7 @@ d <-
 
 ## Design
 
-![An incremental exposure-test design of our experiment. The three *between-participant* conditions (rows) differed in the distribution of voice onset time (VOT) that the single talker during exposure blocks. VOT is the primary cue the contrast between words like "dip" vs. "tip". Test blocks assessed L1-US English listeners' categorization functions over VOT stimuli that were identical within and across conditions.](figures/block_design.png)
+![An incremental exposure-test design of our experiment. The three *between-participant* conditions (rows) differed in the distribution of voice onset time (VOT) during exposure blocks. VOT is the primary cue the contrast between words like "dip" vs. "tip". Test blocks assessed L1-US English listeners' categorization functions over VOT stimuli that were identical within and across conditions.](figures/block_design.png)
 
 ## Procedure
 

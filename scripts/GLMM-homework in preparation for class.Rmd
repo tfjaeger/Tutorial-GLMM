@@ -68,6 +68,7 @@ library(magrittr)  # pipe!
 library(broom)     # working with model output
 library(lme4)      # frequentist GLMMs
 library(sjPlot)
+library(effects)
 library(ggthemes)   # nice themes
 ```
 
@@ -98,7 +99,7 @@ For logistic regression another *optional* reading is James et al. (2013, Ch. 4 
 
 # Quick recap: The generalized linear model (GLM) and generalized linear mixed model (GLMM)
 
-A generalized linear model extends the linear model (LM) to outcome variables drawn from---or *assumed* to be drawn from---the exponential family of distributions. Concise introductions are provided in Gelman & Hill (2007, Ch. 6) or MacElreath (2019, Ch. 10.2). 
+A generalized linear model extends the linear model (LM) to outcome variables drawn from---or *assumed* to be drawn from---the exponential family of distributions. Concise introductions are provided in Gelman & Hill (2007, Ch. 6) or McElreath (2019, Ch. 10.2). 
 
 ## GLMs
 The GLM has three components: the linear predictor ($\eta$), the link function ($g$), and the outcome distribution ($f$), as shown in Figure 1a. Building on our notation for the LM:
