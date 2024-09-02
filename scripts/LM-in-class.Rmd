@@ -191,7 +191,7 @@ Here's the general workflow I'd recommend for an LM analysis, following adequate
 model.matrix(lm(data = d, formula = Response.RT ~ 1 + Condition * VOT)) %>%
   # Select 20 random rows from the model matrix for illustration
   as_tibble() %>%
-  slice_sample(n = 20)
+  slice_sample(n = 15)
 ```
 
 Note that the formula that we use to define our LM contains only all the *known* or *observable* variables, both the outcome variable and the input variables. The *unknown latent* variables---the $\beta$s and $\sigma$---are not mentioned in the formula. That's because those are the variables we're asking to be *estimated*, e.g., one $\beta$ for each predictor. The estimates that we get from fitting the LM are what is reported in the output of the LM if you print or summarize it.
@@ -324,7 +324,7 @@ get_RSS <- function(a, b, data = dd) {
 
 Now we can use these functions to visualize the predictions and calculate the RSSs for different hypotheses about $a$ and $b$. You can use Acrobat Viewer to animate through the following examples (PDF system preview typically won't work):
 
-```{r, , fig.show='animate', fig.cap="Raw RTs for one participants across the six test blocks (points), along with prediction line for different intercepts {\\em a} and slopes{\\em b} for the model \\texttt{RT} $\\sim$ \\texttt{1 + nBlock}. Compare how the RSS changes, depening on {\\em a} and {\\em b}."}
+```{r, , fig.show='animate', fig.cap="Raw RTs for one participants across the six test blocks (points), along with prediction line for different intercepts {\\em a} and slopes{\\em b} for the model \\texttt{RT} $\\sim$ \\texttt{1 + nBlock}. Compare how the RSS changes, depening on {\\em a} and {\\em b}.", out.width="80%"}
 plot_prediction <- function(a, b, data = dd) {
   RSS <- get_RSS(a, b, data)
   
