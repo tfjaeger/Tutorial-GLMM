@@ -159,6 +159,7 @@ Often it is more intuitive, however, to plot the data in fewer dimensions. For e
 
 
 # General workflow
+
 ```{r}
 # download.file(
 #   url = "https://github.com/hlplab/constraints-on-distributional-learning-VOT/blob/main/data/experiment-results.csv",
@@ -177,7 +178,7 @@ d <-
   mutate(Response.isT = ifelse(Response.Voicing == "voiceless", T, F)) 
 ```
 
-Here's the general workflow I'd recommend for an LM analysis, following adequate data checks, variable typing (e.g., making sure that variables that are factors indeed are factors,, etc.) and filtering (e.g., removal of practice and/or catch trials, outlier exclusion, etc.):
+Here's the general workflow I'd recommend for an LM analysis, following adequate data checks, variable typing (e.g., making sure that variables that are factors indeed are factors, etc.) and filtering (e.g., removal of practice and/or catch trials, outlier exclusion, etc.):
 
  + Get data into table format, with each observation of your data corresponding to one row of the table and separate columns for the outcome and each of the input variables.^[What counts as an observation will depend on both your hypothesis (e.g., whether it is meant to test a hypothesis within a participant or across participants) and the type of model you're using (e.g., an LM vs. a linear mixed-effects model).]
 
@@ -215,6 +216,7 @@ knitr::include_graphics("figures/block_design.png")
 Specifically, the green condition has the exact same distribution as the red condition, but shifted 10ms to the right; the blue condition is shifted +40ms to the right. This design makes it possible to assess how participants' interpretation of the same physical VOT input during the gray test blocks changes as a function of the differently shifted VOT distributions during the exposure blocks. **This makes it possible to test whether listeners change their categorization functions over VOT as a function of recent input from a talker**.
 
 121 participants were included for analysis, each providing 144 exposure trials (3 blocks) and 72 test trials (6 blocks). Participants were unaware of the exposure-test structure of the experiment, and the procedure for exposure and test trials was identical: participants saw two words on the screen (e.g., "dip" and "tip"). Participants then heard a recording of a single word and then had to click the word they heard. All recordings were spoken by the same voice. Here **we use only the data from the six gray test blocks**, leaving `r nrow(d)` observations. 
+
 ## The data
 Since we want to avoid violations of the assumption of independence, we use the data from a single participant from the Shift40 condition, living us with $6 * 12 = 72$ observations. Here's some of the data of that participant. If you downloaded this R markdown document, feel free to change the participant, and see how that changes the results. 
 
@@ -375,6 +377,29 @@ d.rss %>%
   scale_fill_viridis_b(trans = "log10") +
   coord_cartesian(expand = FALSE) +
   theme(legend.position = "top", legend.key.width=unit(1,"cm"))
+```
+
+```{r, fig.height=4, fig.width=4, out.width="66%"}
+# last_plot() +
+#   annotate(
+#     geom = "linerange", 
+#     orientation = "x",
+#     y = as.numeric(coef(m)[2]),
+#     xmin = qnorm(.025, coef(summary(m))[1,1], coef(summary(m))[1,2]),
+#     xmax = qnorm(.975, coef(summary(m))[1,1], coef(summary(m))[1,2])) +
+#   annotate(
+#     geom = "linerange",
+#     orientation = "y",
+#     x = coef(m)[1],
+#     ymin = qnorm(.025, coef(summary(m))[2,1], coef(summary(m))[2,2]),
+#     ymax = qnorm(.975, coef(summary(m))[2,1], coef(summary(m))[2,2])) +
+#   coord_cartesian(
+#     xlim = range(
+#       qnorm(.025, coef(summary(m))[1,1] , coef(summary(m))[1,2]),
+#       qnorm(.975, coef(summary(m))[1,1] , coef(summary(m))[1,2])), 
+#     ylim = range(
+#       qnorm(.025, coef(summary(m))[2,1] , coef(summary(m))[2,2]),
+#       qnorm(.975, coef(summary(m))[2,1] , coef(summary(m))[2,2])))
 ```
 
 Here's an example of how one can use a general optimizer to find the best-fitting estimates for an LM. The example uses R's \texttt{optim()} function but you can try to implement it in your preferred programming language.^[By default, \texttt{optim()} uses Quasi-Newtonian optimization. This works just fine for the present purpose.] You can compare its output to the estimates reported at the start of the section:
