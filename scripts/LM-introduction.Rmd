@@ -293,14 +293,10 @@ summary(m)
 ```
 
 # Fitting
-Consider the following fitted LM:
+Consider the following fitted LM from the previous section:
 
 ```{r}
-# make a new numeric predictor nBlock 
-dd %<>%
-  mutate(nBlock = as.numeric(Block))
-
-m <- lm(formula = Response.RT ~ 1 + nBlock, data = dd)
+m <- lm(formula = Response.RT ~ 1 + VOT, data = dd)
 summary(m)
 ```
 
@@ -308,11 +304,11 @@ How did the model fitting algorithm arrive at the estimates and what do they pre
 
 One way to find the best-fitting estimates for the coefficients of an LM is to minimize the total prediction error. For each observation in our data, the prediction error or *residual* of the model $m$ is defined as the difference between the predicted value of $y$, ${\rm E_m}[y]$, and the actually observed value of $y$, i.e., $residual = y - {\rm E_m}[y]$. Since we don't want negative and positive prediction errors (resulting from over- and under-predicting $y$, respectively) to cancel each other out, we cannot simply sum those prediction errors to get an estimate of how well the model fits our data. Instead, we sum the squared residuals, giving us the residual sum of squares (RSS).^[One could instead use any other function that would result in only positive prediction errors (e.g., taking the *absolute* prediction error). However, using the squared residuals has both appealing properties, and it turns out to be identical---for LMs---to maximizing the likelihood of the data.] Finding the best-fitting estimates then becomes the identical to finding the estimates that minimize the RSS.
 
-To better understand what happens when we find the best-fitting estimates by minimizing the RSS, let's define a few function that help use deliver predictions just like the final LM presented above does, but for arbitrary intercept values $a$ and arbitrary slope values $b$ for the effect of Block. We also define a function that gets the prediction error for each observation in our data, and a function that sums up the squared prediction error:
+To better understand what happens when we find the best-fitting estimates by minimizing the RSS, let's define a few function that help use deliver predictions just like the final LM presented above does, but for arbitrary intercept values $a$ and arbitrary slope values $b$ for the effect of VOT We also define a function that gets the prediction error for each observation in our data, and a function that sums up the squared prediction error:
 
 ```{r, echo=TRUE}
 get_prediction <- function(a, b, data = dd) {
-  a + b * as.numeric(dd$nBlock)
+  a + b * dd$VOT
 }
 
 get_prediction_error <- function(a, b, data = dd) {
@@ -326,12 +322,12 @@ get_RSS <- function(a, b, data = dd) {
 
 Now we can use these functions to visualize the predictions and calculate the RSSs for different hypotheses about $a$ and $b$. You can use Acrobat Viewer to animate through the following examples (PDF system preview typically won't work):
 
-```{r, , fig.show='animate', fig.cap="Raw RTs for one participants across the six test blocks (points), along with prediction line for different intercepts {\\em a} and slopes{\\em b} for the model \\texttt{RT} $\\sim$ \\texttt{1 + nBlock}. Compare how the RSS changes, depening on {\\em a} and {\\em b}.", out.width="80%"}
+```{r, , fig.show='animate', fig.cap="Raw RTs for one participants across the six test blocks (points), along with prediction line for different intercepts {\\em a} and slopes{\\em b} for the model \\texttt{RT} $\\sim$ \\texttt{1 + VOT}. Compare how the RSS changes, depening on {\\em a} and {\\em b}.", out.width="80%"}
 plot_prediction <- function(a, b, data = dd) {
   RSS <- get_RSS(a, b, data)
   
   data %>%
-    ggplot(aes(x = nBlock, y = Response.RT)) +
+    ggplot(aes(x = VOT, y = Response.RT)) +
     geom_point(alpha = .3) +
     geom_abline(aes(intercept = a, slope = b), color = "blue") +
     annotate(
@@ -344,7 +340,7 @@ plot_prediction <- function(a, b, data = dd) {
       label = deparse(bquote(RSS == .(RSS))), 
       parse = T,
       x = 9, y = 0, hjust = 1, vjust = 0, color = "orange", size = 6) +
-    xlab("Block") + ylab("Response RT")
+    xlab("VOT (msecs)") + ylab("Response RT")
 }
 
 # plot prediction for best fit
@@ -361,7 +357,7 @@ plot_prediction(coef(m)[1], coef(m)[2] * -1)
 
 We can also visualize the RSS---i.e., the function we're trying to minimize---depending on the a wide range of values for $a$ and $b$. This illustrates two things. First, the estimates provided by the LM at the start of this section indeed minimize the RSS of the model. Second, RSS are a convex function of the parameters in the model (here $a$ and $b$), with a single optimum. This very appealing property of LMs allows for efficient fitting algorithms that are *guaranteed* to converge within an arbitrary finite number of steps against the optimal parameters. Basically, it means that going downhill is bound to get you closer to the optimum, rather than stuck in a local minimum (as can be the case for more complex optimization problems, e.g,. for many types of non-linear models).
 
-```{r, fig.cap="RSS for the model \\texttt{RT} $\\sim$ \\texttt{1 + nBlock}, depending on its intercept $a$ and slope $b$. The white point shows that location of the estimates given in the LM output at the beginning of this section.", fig.height=4, fig.width=4, out.width="66%"}
+```{r, fig.cap="RSS for the model \\texttt{RT} $\\sim$ \\texttt{1 + VOT}, depending on its intercept $a$ and slope $b$. The white point shows that location of the estimates given in the LM output at the beginning of this section.", fig.height=4, fig.width=4, out.width="66%"}
 # get RSS for a grid of a and b
 d.rss <- 
   crossing(
@@ -373,7 +369,7 @@ d.rss %>%
   ggplot(aes(x = a, y = b)) +
   geom_tile(aes(fill = RSS)) +
   geom_point(color = "white", x = coef(m)[1], y = coef(m)[2]) +
-  xlab("intercept a") + ylab("slope b") +
+  xlab("intercept a") + ylab("slope b of VOT") +
   scale_fill_viridis_b(trans = "log10") +
   coord_cartesian(expand = FALSE) +
   theme(legend.position = "top", legend.key.width=unit(1,"cm"))
@@ -382,24 +378,63 @@ d.rss %>%
 ```{r, fig.height=4, fig.width=4, out.width="66%"}
 # last_plot() +
 #   annotate(
-#     geom = "linerange", 
-#     orientation = "x",
-#     y = as.numeric(coef(m)[2]),
-#     xmin = qnorm(.025, coef(summary(m))[1,1], coef(summary(m))[1,2]),
-#     xmax = qnorm(.975, coef(summary(m))[1,1], coef(summary(m))[1,2])) +
-#   annotate(
 #     geom = "linerange",
 #     orientation = "y",
-#     x = coef(m)[1],
+#     y = as.numeric(coef(m)[2]),
+#     xmin = qnorm(.025, coef(summary(m))[1,1], coef(summary(m))[1,2]),
+#     xmax = qnorm(.975, coef(summary(m))[1,1], coef(summary(m))[1,2]),
+#     color = "white") +
+#   annotate(
+#     geom = "linerange",
+#     x = as.numeric(coef(m)[1]),
 #     ymin = qnorm(.025, coef(summary(m))[2,1], coef(summary(m))[2,2]),
-#     ymax = qnorm(.975, coef(summary(m))[2,1], coef(summary(m))[2,2])) +
+#     ymax = qnorm(.975, coef(summary(m))[2,1], coef(summary(m))[2,2]),
+#     color = "white") +
+#   annotate(
+#     geom = "text",
+#     x = as.numeric(coef(m)[1]),
+#     y = qnorm(.025, coef(summary(m))[2,1], coef(summary(m))[2,2]),
+#     label = round(d.rss[
+#       d.rss$a == d.rss$a[which.min(abs(d.rss$a - qnorm(.025, coef(summary(m))[2,1], coef(summary(m))[2,2])))] &
+#       d.rss$b == d.rss$b[which.min(abs(d.rss$b - as.numeric(coef(m)[1])))],]$RSS),
+#     vjust = 1, color = "white") +
+#   annotate(
+#     geom = "text",
+#     x = as.numeric(coef(m)[1]),
+#     y = qnorm(.975, coef(summary(m))[2,1], coef(summary(m))[2,2]),
+#     label = round(d.rss[
+#       d.rss$a == d.rss$a[which.min(abs(d.rss$a - qnorm(.975, coef(summary(m))[2,1], coef(summary(m))[2,2])))] &
+#       d.rss$b == d.rss$b[which.min(abs(d.rss$b - as.numeric(coef(m)[1])))],]$RSS),
+#     vjust = 0, color = "white") +
+#   annotate(
+#     geom = "text",
+#     x = qnorm(.025, coef(summary(m))[1,1], coef(summary(m))[1,2]),
+#     y = as.numeric(coef(m)[2]),
+#     label = round(d.rss[
+#       d.rss$a == d.rss$a[which.min(abs(d.rss$a - qnorm(.025, coef(summary(m))[1,1], coef(summary(m))[1,2])))] &
+#       d.rss$b == d.rss$b[which.min(abs(d.rss$b - as.numeric(coef(m)[2])))],]$RSS),
+#     hjust = 1, color = "white") +
+#   annotate(
+#     geom = "text",
+#     x = qnorm(.975, coef(summary(m))[1,1], coef(summary(m))[1,2]),
+#     y = as.numeric(coef(m)[2]),
+#     label = round(d.rss[
+#       d.rss$a == d.rss$a[which.min(abs(d.rss$a - qnorm(.975, coef(summary(m))[1,1], coef(summary(m))[1,2])))] &
+#       d.rss$b == d.rss$b[which.min(abs(d.rss$b - as.numeric(coef(m)[2])))],]$RSS),
+#     hjust = 0, color = "white") +
 #   coord_cartesian(
-#     xlim = range(
-#       qnorm(.025, coef(summary(m))[1,1] , coef(summary(m))[1,2]),
-#       qnorm(.975, coef(summary(m))[1,1] , coef(summary(m))[1,2])), 
-#     ylim = range(
-#       qnorm(.025, coef(summary(m))[2,1] , coef(summary(m))[2,2]),
-#       qnorm(.975, coef(summary(m))[2,1] , coef(summary(m))[2,2])))
+#     xlim = 
+#       qnorm(.5, coef(summary(m))[1,1], coef(summary(m))[1,2]) +
+#       (range(
+#         qnorm(.025, coef(summary(m))[1,1], coef(summary(m))[1,2]),
+#         qnorm(.975, coef(summary(m))[1,1], coef(summary(m))[1,2])) - 
+#          qnorm(.5, coef(summary(m))[1,1], coef(summary(m))[1,2])) * 2,
+#     ylim = 
+#       qnorm(.5, coef(summary(m))[2,1], coef(summary(m))[2,2]) + 
+#       (range(
+#         qnorm(.025, coef(summary(m))[2,1], coef(summary(m))[2,2]),
+#         qnorm(.975, coef(summary(m))[2,1], coef(summary(m))[2,2])) - 
+#          qnorm(.5, coef(summary(m))[2,1], coef(summary(m))[2,2])) * 2)
 ```
 
 Here's an example of how one can use a general optimizer to find the best-fitting estimates for an LM. The example uses R's \texttt{optim()} function but you can try to implement it in your preferred programming language.^[By default, \texttt{optim()} uses Quasi-Newtonian optimization. This works just fine for the present purpose.] You can compare its output to the estimates reported at the start of the section:
@@ -442,11 +477,13 @@ last_plot() +
 ```
 
 ### Apply what you learned
-While minimization of RSS works well for LMs, there is a more generally applicable approach that yields the same results for LMs but also can be used for the fitting of many others types of models, *likelihood maximization*. Under this approach, we find the best-fitting estimates that maximize the likelihood of the observed outcomes $y$. Recall that the LM assumes $y$ to be normally distributed around the predicted ${\rm E}[y]$. This means we can calculate the *likelihood* of each observation under the hypothesized normal distribution. This normal distribution is a function of the hypothesized values for all the model's coefficients ($a$ and $b$ in the example above) *and* the value hypothesized for $sigma$. For any hypothesis about $a$, $b$, and $\sigma$, we can get the density of an observation $y$ under $\mathcal{N}(a + bx, \sigma)$. By multiplying the densities of all observations, we can get the data likelihood under the hypothesized values for $a$, $b$, and $\sigma$. In practice, we instead sum the log-transformed likelihoods. This is numerically more stable, and the $x$ that maximizes $\log(f(x))$ is the same that maximizes $f(x)$.
+While minimization of RSS works well for LMs, there is a more generally applicable approach that yields the same results for LMs but also can be used for the fitting of many others types of models, *likelihood maximization*. Under this approach, we find the best-fitting estimates that maximize the likelihood of the observed outcomes $y$. Recall that the LM assumes $y$ to be normally distributed around the predicted ${\rm E}[y]$. This means we can calculate the *likelihood* of each observation under the hypothesized normal distribution. This normal distribution is a function of the hypothesized values for all the model's coefficients ($a$ and $b$ in the example above) *and* the value hypothesized for $\  sigma$. For any hypothesis about $a$, $b$, and $\sigma$, we can get the density of an observation $y$ under $\mathcal{N}(a + bx, \sigma)$. By multiplying the densities of all observations, we can get the data likelihood under the hypothesized values for $a$, $b$, and $\sigma$. In practice, we instead sum the log-transformed likelihoods. This is numerically more stable, and the $x$ that maximizes $\log(f(x))$ is the same that maximizes $f(x)$.
 
- + Define a function that calculates the sum of log-densities for the model \texttt{RT} $\sim$ \texttt{1 + nBlock} given a set of arguments $a$, $b$, and $\sigma$.^[In R, \texttt{dnorm()} will give you the density of an observation or vector of observations $y$ under a Normal with the specified mean and standard deviations. Use the optional argument \texttt{log = TRUE} to get log densities.]
+ + Define a function that calculates the sum of log-densities for the model \texttt{RT} $\sim$ \texttt{1 + VOT} given a set of arguments $a$, $b$, and $\sigma$.^[In R, \texttt{dnorm()} will give you the density of an observation or vector of observations $y$ under a Normal with the specified mean and standard deviations. Use the optional argument \texttt{log = TRUE} to get log densities.]
  
- + Make a figure like the one shown above for RSS. For this figure set $\sigma$ to the $\sigma$ from the LM at the start of this section.^[In R, use \texttt{sigma()} to extract $\sigma$ from an LM.] We don't expect the likelihood values to be identical to the RSS values---they are on completely different scales. But do the surfaces have similar shapes (curvatures)?
+ + Make a figure like the one shown above for RSS. For this figure set $\sigma$ to the $\sigma$ from the LM at the start of this section.^[In R, use \texttt{sigma()} to extract $\sigma$ from an LM.] We don't expect the likelihood values to be identical to the RSS values---they are on completely different scales. But do the surfaces have similar shapes (curvatures)? 
+ 
+ + To further understand the relationship between OLS and ML fitting of linear regression with normally distributed residuals, see [this presentation, slides 99-122](https://faculty.washington.edu/cadolph/mle/topic2.p.pdf] (it's a lot of slides but that's just because each derivation step is presented as a separate slide).
  
 
 # Terminology
