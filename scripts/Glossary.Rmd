@@ -1,0 +1,44 @@
+---
+title: "Terminology"
+author: "T. Florian Jaeger"
+date: \today
+geometry: margin=2cm
+header-includes:
+  - \usepackage{animate}
+  - \usepackage{booktabs}
+  - \usepackage{tabto}
+  - \usepackage{soul}
+  - \usepackage{xcolor}
+  - \usepackage{placeins}
+  - \usepackage{lscape}
+  - \newcommand{\blandscape}{\begin{landscape}}
+  - \newcommand{\elandscape}{\end{landscape}}
+  - \makeatletter\renewcommand{\fps@table}{!ht}\makeatother
+  - \setstcolor{red}
+  - \usepackage{sectsty}
+  - \sectionfont{\color{blue}} 
+  - \subsectionfont{\color{blue}}
+  - \subsubsectionfont{\color{darkgray}}
+  - \usepackage{caption}
+  - \usepackage{subcaption}
+  - \usepackage{tikz}
+  - \usepackage{url}
+  - \usetikzlibrary{bayesnet}
+output:
+  tufte::tufte_handout: default
+  fontsize: 10pt
+urlcolor: blue
+---
+
+```{r set-options, include=F}
+source("constants.R")
+```
+
+# Terminology
+
+ - **Interactions** take place between *effects* of variables, not the variables themselves. That is, the effects of two predictors on the outcome $y$ might interact, in that the effect of predictor A depends on the effect of predictor B (and vice versa). In my experience, this term creates a lot of confusion since it's often used in ways that go beyond this formal definition.
+
+ - **Relationships** between variables can include the presence of *associations* between the variables, which would (to me) describe the presence of any type of *dependence* between the variables. A *correlation* between two variables is more specific. There are different types of correlations. But the most commonly used Pearsson correlation describes a proportional relation.
+ 
+ - **Residuals** are the (prediction) error of a model for each observation. They can be used both in model diagnostics (e.g., to test the assumption of equality of variance for the linear model) and in model fitting (e.g., to minimize the sum of the squared residuals when fitting a linear model with the ordinary least square method).
+
