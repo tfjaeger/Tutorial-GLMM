@@ -35,7 +35,6 @@ source("constants.R")
 ```
 
 # Readings and assignments in *preparation* of this class
-
 In preparation for class, please **read *James et al. (2013)*, Chapter 3 up to---but not including---3.2 (12 pages)**. This text is quite intuitive and assumes comparatively little background. But if you find yourself getting lost, please stop and first read or watch one of the many more informal introductions to linear models (e.g., [this one](https://medium.com/analytics-vidhya/linear-regression-an-intuitive-approach-ded05ed39a87)). Then try to read James et al. (2013).^[James et al. (2013) *An introduction to statistical learning* is the an attempt---a wonderful attempt, full of effective visualization, I think---to make the content of one of the most influential books in machine learning (“Statistical learning” by Tibshirani and colleagues, the developers of bootstrap and other important non-parametric approaches) accessible to a non-expert audience.] **You should plan for 1-2h of reading and summarizing your questions in preparation for this week of the class.**
 
 Optionally, those of you have interests beyond the basics of the LM, and find it intriguing to ponder about why we use the models we use, might enjoy reading p. 73-78 of McElreath’s (2019) *Statistical Rethinking$^2$*. It’s an amazing book, and these few pages accessibly and thought-provokingly take you through the question of why we often feel comfortable assuming normality in our analyses (as is done in the linear model).
@@ -238,6 +237,7 @@ For this particular example, there isn't much to report. Note that we wouldn't u
 \color{black}
 A few considerations:
  
+ + I recommend you provide both the relevant statistics (coefficient estimates, $p$-values, etc.), and a descriptive interpretation of that result in non-technical language---but we careful to avoid language that is wrong. 
  + **Use $\widehat{\beta}$ when we describe coefficient estimates and write up results**. This emphasizes that these are *estimates* of the assumed population parameters ($\beta$).
  + Try to resist language that suggests significance even when it was not found, as in "... did not reach significance".
  + Do not take $p$-values to indicate effect strength. It is ok to write things like "highly significant effect" but that is not the same as a "large effect". Similarly, a "large effect"---in whatever way that is determined---is not necessarily the same a "theoretically particularly important" effect.
