@@ -126,7 +126,7 @@ $\leftarrow$ **These questions can be assessed with methods like mixed-effect re
 
 $\leftarrow$ Generalized linear mixed-effects regression allow tests of stronger predictions (stronger = more easily rejectable)
 
-##  
+## 
 
 ::: center-xy
 **An example**
@@ -179,15 +179,14 @@ d <-
 
 $\rightarrow$ When the VOT distributions of the /d/ and /t/ categories are shifted 'rightwards' along VOT, we expect listeners to also shift their categorization function rightwards:
 
-   + Point of subjective equality (PSE) should shift rightwards
-   + Listeners should be *less* likely to hear the same VOT input as a "t" (and more likely to hear it as a "d").
+-   Point of subjective equality (PSE) should shift rightwards
+-   Listeners should be *less* likely to hear the same VOT input as a "t" (and more likely to hear it as a "d").
 
-$\rightarrow$ The *magnitude* of these effects should order: +40 > +10 > +0 condition.
+$\rightarrow$ The *magnitude* of these effects should order: +40 \> +10 \> +0 condition.
 
-   + If distributional learning leads to linear / proportional shifts in listeners' beliefs about VOT distribution, listeners in +40 condition should shift categorization function 4-times as much as listeners in +10 condition (relative to +0 condition).
+-   If distributional learning leads to linear / proportional shifts in listeners' beliefs about VOT distribution, listeners in +40 condition should shift categorization function 4-times as much as listeners in +10 condition (relative to +0 condition).
 
 ![](figures/block_design.png)
-
 
 ## Predictions tested in Tan & Jaeger
 
@@ -208,7 +207,6 @@ Predictions of distributional learning models of adaptive speech perception for 
 (4) *learn to convergence*
 
 (5) *diminishing returns*
-
 
 ## Note
 
@@ -679,4 +677,3 @@ d.test %>%
 facet_wrap(~ as.numeric(as.character(Block))) +
   theme(legend.position = "top")
 ```
-
