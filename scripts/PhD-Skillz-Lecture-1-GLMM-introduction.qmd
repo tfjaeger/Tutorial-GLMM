@@ -357,7 +357,7 @@ anova(LMM)
 
 . . .
 
--   Qualitatively replicates mixed ANOVA (not quite identical because different corrections were applied to DFs and we are now using *trial*-level data $\leftarrow$ no aggregation)
+-   Qualitatively replicates mixed ANOVA (not quite identical because different corrections were applied to DFs and we are now using *trial*-level data $\leftarrow$ partial pooling)
 
 ## Coding hypotheses
 
