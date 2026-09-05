@@ -6,9 +6,14 @@ library(magrittr)  # pipe!
 
 library(tufte)     # Tufte-style handout formatting
 library(gganimate) # animation of plots
+library(patchwork)
 
 library(broom)     # working with model output
 library(ggthemes)  # nice themes for plotting
+
+library(brms)
+library(rstanarm)
+library(marginaleffects)
 
 # set R markdown formatting
 opts_chunk$set(dev = 'pdf',

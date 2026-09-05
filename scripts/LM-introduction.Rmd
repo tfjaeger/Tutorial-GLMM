@@ -39,6 +39,26 @@ source("constants.R")
 
 # Readings and assignments in *preparation* of this class
 
+\begin{marginfigure}
+  \centering
+  \tikz{ %
+    \node[obs] (outcome) {$y_i$} ; %
+    \factor[above=of outcome] {distribution} {left: \textcolor{gray}{$\mathcal{N}$}} {} {}; %
+    \node[latent, right=of distribution] (sigma) {$\sigma$} ; %
+    \node[det, above=of distribution] (mu) {$\mu_i$} ; %
+    \node[obs, above=of mu] (X) {$x_i$} ; %
+    \node[latent, right=of X] (beta) {$\beta$} ; %
+    % plates
+    \plate[inner sep=0.12cm, xshift=-0.06cm, yshift=0.06cm] {plate1} {(mu) (distribution) (X) (outcome)} {$\forall i=1 \ldots N $}; %
+    \edge {distribution} {outcome} ; %
+    \edge {mu} {distribution} ; %
+    \edge {sigma} {distribution} ; %
+    \edge {X, beta} {mu} ; %
+  }
+  \caption{A graphical model visualization of the linear model, shown here in case you find it helpful. Shaded circles are observable variables. White circles are latent variables. These are the variables that constitute the degrees of freedom of the model, the paramters that are fit to the data. Diamonds shapes indicate variables that are determined by other variables. The index $i = 1, ..., N$ refers identifies the observations (usually, the rows) in your data. Note that $\sigma$, unlike $\mu_i$ is assuemd to be constant across observations. This is the assumption of the homogeneity of variance, which you might have heard of if you're familiar with $t$-tests or ANOVA.}\label{fig:lm}
+
+\end{marginfigure}
+
 In preparation for class, please **read *Regression and other stories* (ROS),
 Chapters 6 & 7.1-2**. This text is quite intuitive and assumes comparatively little
 background. But if you find yourself getting lost, please stop and first read or
@@ -65,17 +85,21 @@ press of a button.
 # The linear model (LM)
 
 LMs (aka linear regression) can be thought of as an example of a much larger
-family of models that describe an *outcome* variable $y$ (aka the *dependent*
+family of regression models that describe an *outcome* variable $y$ (aka the *dependent*
 variable) as the function $g$ of one or more *predictor* variables $x_1$, ...,
 $x_k$ (aka *independent* variables), $y = g(x_1, ..., x_k)$. In this sense, the
-LM is a---very constrained---*predictive model*. Specifically, the LM assumes
+LM is a---very constrained---*predictive model*.[^1] Specifically, the LM assumes
 that $y$ is a draw from a Normal distribution $\mathcal{N}$ with constant
 standard deviation $\sigma$ and a mean $\mu$ that is a *linear combination* (the
 weighted sum) of all the predictors included in the model:
 
+[^1]: While the LM is a specific case of a much wider class of models, it is already 
+a rather general model. For example, $t$-tests and analysis of variances (ANOVA) are 
+special cases of LMs. We'll return to this point in a later lecture.
+
 \begin{align}
 \mathbf{y} & \sim & \mathcal{N}(\mu, \sigma_{resid}) \\
-\mu & = & \beta_1 \mathbf{x_1} + ... \beta_k \mathbf{x_k}  \\
+\mathbf{E}[y] & = & \beta_1 \mathbf{x_1} + ... \beta_k \mathbf{x_k}  \\
     & = & X\beta
 \end{align}
 
@@ -83,33 +107,13 @@ Here, $y$ is a column vector of outcome observations of length $n$ (e.g., a
 column in your data table), $X$ is is called the $n$ x $k$ *model (or design)
 matrix* (e.g., in the simplest case, a number of $k$ columns in your data table)
 and $\beta$ is a vector of weight values of length $k$ (aka coefficients)---one
-for each of the $k$ predictors in the model.
-
-\begin{marginfigure}
-  \centering
-  \tikz{ %
-    \node[obs] (outcome) {$y_i$} ; %
-    \factor[above=of outcome] {distribution} {left: \textcolor{gray}{$\mathcal{N}$}} {} {}; %
-    \node[latent, right=of distribution] (sigma) {$\sigma$} ; %
-    \node[det, above=of distribution] (mu) {$\mu_i$} ; %
-    \node[obs, above=of mu] (X) {$x_i$} ; %
-    \node[latent, right=of X] (beta) {$\beta$} ; %
-    % plates
-    \plate[inner sep=0.12cm, xshift=-0.06cm, yshift=0.06cm] {plate1} {(mu) (distribution) (X) (outcome)} {$\forall i=1 \ldots N $}; %
-    \edge {distribution} {outcome} ; %
-    \edge {mu} {distribution} ; %
-    \edge {sigma} {distribution} ; %
-    \edge {X, beta} {mu} ; %
-  }
-  \caption{A graphical model visualization of the linear model. Shaded circles are observable variables. White circles are latent variables. These are the variables that constitute the degrees of freedom of the model, the paramters that are fit to the data. Diamonds shapes indicate variables that are determined by other variables. The index $i = 1, ..., N$ refers identifies the observations (usually, the rows) in your data. Note that $\sigma$, unlike $\mu_i$ is assuemd to be constant across observations. This is the assumption of the homogeneity of variance.}\label{fig:lm}
-
-\end{marginfigure}
+for each of the $k$ predictors in the model. $\mathbf{E}[y]$ refers to the *expected value* of $y$, which is the mean of the Normal distribution from which $y$ is assumed to be drawn.
 
 In the literature, LMs are often written in a number of different ways. For
 instance, one might describe the linear model for each observation $i$ of the
-outcome $y_i$ and all predictors $x_{1,i}, ..., x_{k,i}$:[^1]
+outcome $y_i$ and all predictors $x_{1,i}, ..., x_{k,i}$:[^2]
 
-[^1]: $\epsilon_i$ is the *residual* for observation $i$ (observed $y_i$ -
+[^2]: $\epsilon_i$ is the *residual* for observation $i$ (= observed $y_i$ -
     predicted $\hat{y_i}$).
 
 \begin{align}
@@ -130,8 +134,8 @@ or combining equations (1) and (3) from above, as in Gelman & Hill (2007, p.
 \mathbf{y} & = & \mathrm{Normal}(X\beta, \sigma_{resid}) &  &  & 
 \end{align}
 
-Any of these formulations are equivalent, and all are used in the literature.
-Finally, a common---but arbitrary---convention is to use a different symbol for
+Any of these formulations are equivalent, and all are used in the literature. I'm mentioning them here only since it can be confusing as a learner to see these different 
+notations. There is no need to memorize them. Finally, a common---but arbitrary---convention is to use a different symbol for
 one particular predictor, the *intercept* $\alpha$:
 
 \begin{align}
@@ -143,7 +147,9 @@ y   & \sim & \mathcal{N}(\mu, \sigma) \\
 Here, $x_0$ is assumed to be the constant 1, i.e., $x_0 = 1$. This convention
 singles out $\alpha$, which helps to realize that it has an intuitive
 interpretation: it is the predicted value of the outcome $y$ when all
-$x_1 = ... = x_k = 0$.
+$x_1 = ... = x_k = 0$.[^3]
+
+[^3]: Depending on how we *code* the predictors $x_1 = ... = x_k = 0$, the intercept can have even conceptually relevant interpretations. For example, if all predictors are centered (so that their means are 0), then the intercept is the predicted sample mean of all $y_i$, $\mathbf{E}[\mathbf{E}[y_i]] = \mathbf{E}[{\mathbf y}]$. We'll learn more about predictor coding in a later lecture.
 
 ## Assumptions of the LM
 
@@ -157,19 +163,19 @@ assumptions, but they do correct for their violations):
 -   **Validity/exhaustivity**.
 
 The other assumptions are more specific to the LM, though the last two of these
-are shared with GLMs and GLMMs, as we'll see in later classes:[^2]
+are shared with generalized linear model (GLM) and generalized linear mixed-effect 
+model (GLMM) that we'll cover in later lectures:[^4]
 
-[^2]: The last two assumptions often confuse learners. To understand them it is
-    important to distinguish between **input variables** and the **predictors**
-    we derive from them. For example, in the case study presented below, one of
-    the input variables is $VOT$. But we could include both $VOT$ and $VOT^2$ as
-    predictors in the model. This would model both linear and quadratic effects
-    of VOT, each of which is assumed linearly add to the predicted outcome $y$.
+[^4]: The final two assumptions sometimes confuse learners, and we'll return to 
+    them in later lectures. For now, I note that it can be helpful to distinguish between **input variables** and the **predictors**
+    we derive from them. For example, in the case study presented below, one *input variable* is $VOT$. But we could include both $VOT$ and $VOT^2$ as
+    separate *predictors* in the LM. This would model both linear and quadratic effects
+    of VOT, both of which are assumed to have linear effects on the outcome $y$.
     Similarly, we can include interactions of the input variable $VOT$ and some
     other predictor in the model, which will add their product as a predictor to
     the model. That is, we can very much use an LM to ask whether two variables
-    have super- or sub-additive interactions. The additivity assumption just
-    means that the effects of the interaction predictor are assumed to be added
+    interact. The additivity assumption just
+    means that the effect of the interaction predictor is assumed to be added
     to the effects of the other predictors in the model.
 
 -   **Normality of errors**. $y$ is drawn from a Normal distribution
@@ -191,32 +197,22 @@ Many, if not most, of these assumptions are actually violated when we apply the
 model. To some extent linear regression is robust to such violations, depending
 on the specific assumption. For example, instead of equality of variance it is
 often sufficient that variances are similar (*homogeneity* of variance) or that
-the variance-covariance matrix does not exhibit *heteroscedasticity*.[^3] **But
+the variance-covariance matrix does not exhibit *heteroscedasticity*.[^5] **But
 violations of the independence, normality, or homoscedasticity assumptions can
 make a model invalid, and the statistical inferences based on it invalid**
 (e.g., by inflating Type I and II errors). We return to these points in later
 classes.
 
-[^3]: From Ancient Greek [*hetero*---"different" and
+[^5]: From Ancient Greek [*hetero*---"different" and
     *skedasis*---"dispersion"](https://en.wikipedia.org/wiki/Heteroscedasticity).
     Homoscedasticity extends the notion of homogeneity of variance to the
     *co*variance between variables
 
 ## Use of the LM in our field(s)
 
-While the LM can be used as a predictive model---i.e., to make predictions about
-unseen data---this is rarely done in our fields. Rather, we tend to fit an LM to
-our data, and then conduct statistical inferences about the *effects* of one or
-more of the model's predictors based on the best-fitting parameterization of
-that model. Best-fitting parameterization refers to the choice of $\beta$s (and
-the residual standard deviation $\sigma$, though we don't tend to be interested
-in this parameter) that make the LM deliver the best predictions about the
-observed values of $y$.
+While the LM can be used as a predictive model---i.e., to make predictions about unseen data---this is not the primary use of the LMin our fields. Rather, we tend to fit an LM (or other regression models) to the sample of data we have collected, and then conduct statistical inferences about the *effects* of one or more of the model's predictors based on the best-fitting parameterization of that model. Best-fitting parameterization refers to the estimates of $\beta$s (and the residual standard deviation $\sigma$, though we don't tend to be interested in this parameter) that make the LM deliver the best predictions about the observed values of $y$.[^6]
 
-We'll learn later what "best" means here, and how those best-fitting parameters
-and their standard errors are obtained. For now, we'll assume that those are
-known, and focus on what they tell us about the effects of the different
-predictors that are included in the LM.
+[^6]: We'll learn in later lectures what "best" means here, and how those parameters are obtained. For now, we'll assume that those are known, and focus on what they tell us about the effects of the different predictors that are included in the LM.
 
 When we employ an LM during data analysis, we are making the assumption that
 this model describes the relation between the predictors and the outcome in the
@@ -229,7 +225,11 @@ effects can confound our analysis).
 
 Generally speaking, an LM with $k$
 predictors (plus the intercept) can be thought of as defining a hyperplane in a
-$k+1$ dimensional space, where the additional dimension is the outcome. For
+$k+1$ dimensional space, where the additional dimension is the outcome. We'll 
+cover this part in more depth in class since it's easier to appreciate on a whiteboard. 
+A great introduction with effective visualizations is provided in James et al. (2013, Ch 3)  *Introduction to statistical learning*.
+
+For
 instance, for a single predictor, the LM defines a line that describes the
 predicted outcome as a function of the single predictor. For two predictors, the
 LM defines a plane in the 3D space defined by the two predictors and the
@@ -267,19 +267,25 @@ d <-
 Here's the general workflow I'd recommend for an LM analysis, following adequate
 data checks, variable typing (e.g., making sure that variables that are factors
 indeed are factors, etc.) and filtering (e.g., removal of practice and/or catch
-trials, outlier exclusion, etc.):
+trials, outlier exclusion, etc.). Some of these steps won't yet make sense since 
+they refer to concepts we have not yet covered. I mention them here so that you 
+can use this workflow section as a general recipe to look up later.
 
 -   Get data into table format, with each observation of your data corresponding
     to one row of the table and separate columns for the outcome and each of the
-    input variables.[^4]
+    input variables. What counts as an observation depends on the question you 
+    intend to ask.
 
--   Decide how to code the factors in your data, so that each of the factor
+-   Decide whether to transform your continuous input variables,
+    e.g., by centering and/or standardizing them. Decide how to code the factors in your data, so that each of the factor
     input variables can be translated into one ore more numerical
-    predictors.[^5] Decide whether to transform your continuous input variables,
-    e.g., by centering and/or standardizing them.
+    predictors. We'll cover how to code categorical predictors in a separate
+    lecture. For now, I'll note that most statistics packages will 
+    quietly apply default coding if you do not specify it yourself. 
+    Since the interpretation of the regression output depends on the specific predictor coding, this is something that you should always keep in mind.
 
--   Define the regression formula $y \sim 1 + x_1 + ... + x_k$, where 1 stands
-    for the constant 1. Together with the data table and information about the
+-   Define the regression formula $y \sim 1 + x_1 + ... + x_k$, **where 1 stands
+    for the constant 1**. Together with the data table and information about the
     factor coding (which is stored as an attribute to the factor column in the
     data.frame in R and in many similar programs), this formula contains all the
     information that is required for a function intended to fit the model to the
@@ -298,19 +304,6 @@ trials, outlier exclusion, etc.):
     number of other common formula abbreviations that will expand into multiple
     columns in the design matrix. If you're not sure what a formula does, I
     recommend simply looking at the model matrix it creates. E.g., in R:
-
-[^4]: What counts as an observation will depend on both your hypothesis (e.g.,
-    whether it is meant to test a hypothesis within a participant or across
-    participants) and the type of model you're using (e.g., an LM vs. a linear
-    mixed-effects model).
-
-[^5]: In R, the \texttt{contrasts()} function and the family of \texttt{contr.*}
-    functions are very helpful in setting up the contrasts for your factors,
-    without having the manually change the column in the data frame. This
-    approach means that the factors in the data table remain factors (allowing
-    character values), avoiding the confusion that can result when factors are
-    manually transformed into numeric predictors that are stored in the data
-    table.
 
 ```{r model-matrix, echo=TRUE}
 model.matrix(lm(data = d, formula = Response.RT ~ 1 + Condition * VOT)) %>%
@@ -409,73 +402,122 @@ need to make is how we'd like to code VOT. For example, we could treat VOT as a
 continuous predictor or as a factor with 12 distinct levels (the number of
 measurement locations along VOT). And, if we treat VOT as a continuous
 predictor, we could include only linear VOT or also quadratic VOT or higher
-order polynomials, provided we have enough data to avoid overfitting.[^6]
+order polynomials, provided we have enough data to avoid overfitting.[^8]
 Similarly, we could decide to include log-transformed VOT instead of VOT, or
 other transforms. As described above, the linearity assumption of LMs does not
 prevent us from applying non-linear transform to any of the input variables.
 
-[^6]: As a rule of thumb, the number of coefficients in the LM should be less
+[^8]: As a rule of thumb, the number of coefficients in the LM should be less
     than 1/20th of the number of data points, $k < n / 20$. But that's just a
     rule of thumb, and details depend on how balanced the data is with regard to
     the distribution of predictor values.
 
 For the present example, we will treat VOT as a continuous predictor and only
-include its linear component.[^7] 
+include its linear component.[^9] 
 
-[^7]: When we treat a predictor $x$ as continuous, we making the assumption that
+[^9]: When we treat a predictor $x$ as continuous, we making the assumption that
     a change in its value of 1 unit has the same effect on the outcome $y$,
     regardless of where along $x$ that change is added. That follows from the
     linearity assumption mentioned above.
 
 A second decision we need to make---not necessarily in this order---is what statistical 
 framework to use. For example, we could use a frequentist framework or we could use a 
-Bayesian framework. If you don't recall the difference between these framework, I recommend 
+Bayesian framework. If you've never heard about these frameworks, I recommend 
 reading Ch 1 of Gelman et al. 2025 ("Regressions and other stories"). It provides a *very*
-concise and neutral overview of these two ways of thinking about statistics. There is a lot 
-of decisions hidden in the choice of framework, and the choice does have consequences for 
-how we would fit the model. But let's not get bogged down in these details for now. We'll 
-cover these differences in another lecture.
+concise, high-level and neutral overview of these two ways of thinking about statistics. 
+There is a lot of decisions hidden in the choice of framework, and the choice does have 
+consequences for how we fit the model. The choice between these 
+frameworks also *can*, but doesn't necessarily always, affect the conclusions we would draw 
+from our analysis. That is why we will revisit the distinction between frequentist and 
+Bayesian statistics later in the semester. 
 
-Let's see what a frequentist LM tells us:
+For now, here's a frequentist LM. The R function `lm` automatically fits to the model with 
+the specified formula to the data `dd`:
 
 ```{r, echo=T}
-m <- lm(formula = Response.RT ~ 1 + VOT, data = dd)
-summary(m)
+lm.frequentist <- lm(formula = Response.RT ~ 1 + VOT, data = dd)
+print(lm.frequentist)
+```
+
+This basic output, which shows the best-fitting parameter estimates for the intercept, $\hat{\alpha}$, and the slope of VOT, $\hat{\beta}$, looks almost identical if we instead look at a Bayesian LM.[^priors] Both outputs, also start with a brief summary of what type of model we fit (an LM, which assumes gaussian/normally-distributed residuals) and what formula 
+we used:
+
+[^priors]: These estimates were obtained using `stan_glm`'s (weakly informative) 
+    default priors, which have little influence on the posterior distribution of 
+    the parameters, and help avoid overfitting. If that all sounds like gibberish 
+    to you, don't fret. We'll cover priors and Bayesian statistics in later lectures. 
+
+```{r, echo=T, results='asis'}
+lm.bayesian <- stan_glm(formula = Response.RT ~ 1 + VOT, data = dd)
+print(lm.bayesian)
+```
+
+```{r, echo=FALSE}
+# Using this method since stan_glm prints through the C++ stdout, which knitr doesn't capture
+# (this isn't an issue when working with stan_glm in the console).
+cat(capture.output(print(lm.bayesian)), sep = "\n")
+```
+
+\begin{marginfigure}
+
+```{r, fig.width=3.5, fig.height=5}
+p.frequentist <- plot_predictions(lm.frequentist, by = "VOT") + xlab("VOT (ms)") + ylab("Response RT (ms)") + ggtitle("Frequentist LM") + geom_point(data = dd, aes(x = VOT, y = Response.RT), size = .1, color = "black", alpha = .5)
+p.bayesian <- plot_predictions(lm.bayesian, by = "VOT") + xlab("VOT (ms)") + ylab("Response RT (ms)") + ggtitle("Bayesian LM") + geom_point(data = dd, aes(x = VOT, y = Response.RT), size = .1, color = "black", alpha = .5)
+
+p.frequentist /
+ p.bayesian
+```
+
+\caption{For the present example, the frequentist and Bayesian LM yield similar estimates, and make very similar predictions. The plots show the predicted response RTs as a function of VOT, with 95\% confidence intervals (frequentist) or credible intervals. Points show the data.} \label{fig:lm-predictions}
+
+\end{marginfigure}
+
+The specific output will depend on the package you use. For this particular set of functions, the default output of the Bayesian `stan_glm` function is a bit more verbose; it also prints, for instance, the estimate of the residual standard deviation, $\hat{\sigma}_\epsilon$. This information is also present in the frequentist model; it just wasn't plotted as part of the default output:
+
+```{r, echo=TRUE}
+sigma(lm.frequentist)
+```
+
+While the estimates of the two models aren't exactly identical, they are quite similar for this example (see also Fig. @\ref(fig:lm-predictions)). This won't always be the case. In later lectures, we'll cover how the choice 
+of prior for Bayesian models affects the outcomes, why this is sometimes used to criticize Bayesian statistics, and why this criticism can be misguided. For now, we'll focus on the frequentist LM output, which is likely more familiar. We can obtain more information about the fitted model by summarizing it:
+
+
+```{r, echo=T}
+summary(lm.frequentist)
 ```
 
 This output can be split into four parts. At the top, the model call is
 repeated, which is convenient, for example, when we look at a stored model
 object that we created some time ago. Below it, we see a statistical summary of
-the residuals.[^8] This summary can be helpful in identifying violations of the
+the residuals.[^10] This summary can be helpful in identifying violations of the
 assumption of normality. Here, for example, there is clear summary that the
 residuals are *not* normally distributed: the minimum/maximum and quantiles are
 not symmetrical around zero. This is to be expected---but often ignored---for
 RTs, which are known to be right-skewed with heavy right tails (due to the
-boundedness of RTs).[^9]
+boundedness of RTs).[^11]
 
-[^8]: **Residuals** are the prediction error of the LM, the difference between
+[^10]: Recall that *residuals* are the prediction error of the LM, the difference between
     the actual and the predicted outcome. Each row of the model matrix $X$
     corresponds to a prediction for that row, and thus has a corresponding
     residual $\epsilon$.
 
-[^9]: For review and large-scale statistical simulations that assess the
+[^11]: For review and large-scale statistical simulations that assess the
     consequences of using LMs and its repeated-measures extension LMMs for the
-    analysis of RTs, see Burchill & Jaeger (2024)-*JML*.
+    analysis of RTs, see Burchill & Jaeger (2024) in *JML*.
 
 The third part of the output summarizes the coefficient estimates
 ($\hat{\beta}$), their standard errors, the resulting $t$-statistic, and its
 $p$-value. The $t$-statistics is a signed measure of the estimates distance from
 0 in terms of its own standard error
-($t = \frac{\hat{\beta}}{SE_{\hat{\beta}}}$).[^10] The $p$-value is the result
+($t = \frac{\hat{\beta}}{SE_{\hat{\beta}}}$).[^12] The $p$-value is the result
 of a Student's $t$-test with the residual DFs of the LM as DFs for the test.
-E.g., for the effect of VOT, $t(70) = `r coef(summary(m))[2,3]`$. And if we look
+E.g., for the effect of VOT, $t(70) = `r signif(coef(summary(lm.frequentist))[2,3], 4)`$. And if we look
 the probability density function for the Student $t$ distribution to ask how
 probable this $t$-value is for DF = 70, we'll get
-`r pt(q = abs(coef(summary(m))[2,3]), df = m$df.residual, lower.tail = F) * 2`,
-which---after rounding---matches the $p$-value reported in the LM for the effect
-of VOT.
+`r signif(pt(q = abs(coef(summary(lm.frequentist))[2,3]), df = lm.frequentist$df.residual, lower.tail = F) * 2, 4)`, 
+matching the $p$-value reported in the LM for the effect of VOT.
 
-[^10]: This is just the [standard definition of a
+[^12]: This is just the [standard definition of a
     $t$-value](https://en.wikipedia.org/wiki/T-statistic) as a measure of how
     different an estimate is from some target value. Here, the target value is 0
     since we want to know whether the coefficient for a predictor is different
@@ -486,23 +528,12 @@ Finally, the bottom part of the LM output provides multiple measures of the
 goodness of fit of the LM. Of these, the $R^2$ tells us how much of the variance
 in the outcome $y$ is accounted for by the model (*for this sample*). Notably,
 an LM can have one or more statistically significant effects even if the model
-overall accounts for very little variance in out observed outcome. Just as the
-size of an effect is not to be confused with its theoretical relevance, the
-$R^2$ of a model is not to be confused with whether it is a good model. Many
-effects of high theoretical relevance might be very small and difficult to
-detect.[^11] The $F$-statistic (here $F(1, 70) = 2.779$) tests whether the
+overall accounts for very little variance in out observed outcome. 
+The $F$-statistic (here $F(1, 70) = 2.779$) tests whether the
 predictors included in the model *together* provide for a statistically
 significantly better fit, compared to an LM with just the intercept (the "null
 model"). The DFs for this test will always be the number of predictors in the
 model. We will return to this $F$-test when we talk about model comparison.
-
-[^11]: Of course, if our goal is to predict a certain human behavior---like an
-    election, or whether someone will choose the red or blue pill---we might
-    indeed only be interested in models that account for much of the observed
-    variance. But keep in mind that we routinely aim to massively *reduce*
-    natural variance in our experiments, e.g., by removing other influences. So
-    be careful not to equate variance explained in a particular experiment with
-    variance in human behavior explained.
 
 ### Write-up
 
@@ -570,24 +601,20 @@ summary(m)
 ```
 
 ## A Bayesian LM
-What if we instead fit the data with a Bayesian LM? The syntax is very similar and so are the results:
-
-```{r, include=F}
-library(brms)
-library(rstanarm)
-options(mc.cores = parallel::detectCores() - 1)
-```
+Finally, let's return to the Bayesian LM we fit above. We can summarize it in the same way as we did for the frequentist LM:
 
 ```{r, echo=T}
-m.bayesian <- stan_glm(formula = Response.RT ~ 1 + VOT, data = dd)
-summary(m.bayesian)
+summary(lm.bayesian)
 ```
 
-Again, the first part summarizes the model we fit, the data we fit it to, and some information about how the model was fit. The second part provides estimates of the coefficients, and their standard errors (= the standard deviation of the estimates). Unlike the frequentist model, the Bayesian LM does not provide a $t$-statistic or a $p$-value based on that statistic. In fact, we don't need either of these parametric summaries of the uncertainty we should maintain about the estimate. That's because the model represents this uncertainty in the 4000 posterior samples it has drawn from the posterior distribution of the three parameters of the LM. The marginal quantiles of these posterior samples are summarized in the output of the LM. These are the posterior samples that we can use to test hypotheses about the parameters of the model, e.g., by asking how many of the posterior samples are above or below 0. For example, we can ask whether RTs decrease with increasing VOT, i.e., whether the coefficient for VOT is negative:
+Again, the first part summarizes the model we fit, the data we fit it to, and some information about how the model was fit. The second part provides estimates of the coefficients, and their standard errors (= the standard deviation of the estimates). Unlike the frequentist model, the Bayesian LM does not provide a $t$-statistic or a $p$-value based on that statistic. In fact, we don't need either of these parametric summaries of the uncertainty we should maintain about the estimate. That's because the model represents this uncertainty in the 4000 posterior samples it has drawn from the posterior distribution of the three parameters of the LM. The quantiles of these posterior samples are summarized in the output of the LM.[^13] These are the posterior samples that we can use to test hypotheses about the parameters of the model, e.g., by asking how many of the posterior samples are above or below 0. For example, we can ask whether RTs decrease with increasing VOT, i.e., whether the coefficient for VOT is negative:
+
+[^13]: Note one interesting difference between the Bayesian and frequentist LM that we'll return to in later lectures: in the frequentist LM, estimate of the standard deviation of the residuals $\hat{\sigma}_\epsilon$ is a point estimate---when we obtained `sigma(lm.frequentist)` above, there was no uncertainty associated with that estimate, unlike for the estimates of the intercept and slope of VOT. This is different in the Bayesian LM, in which we obtain the full posterior distribution of $\sigma_\epsilon$ (summarized in terms of its quantiles in the output). Bayesians maintain uncertainty about *all* parameters in the model. 
 
 ```{r,echo=T}
-hypothesis(m.bayesian, "VOT < 0")
+hypothesis(lm.bayesian, "VOT < 0")
 ```
+
 In this case, the hypothesis test tells us that the mean estimate is indeed negative and that and that 95% of the posterior samples are below 0. We also see an evidence ratio---essentially a Bayes Factor, about which we'll learn more later. This evidence ration tells us the odds that a random posterior sample of the 4000 samples in the fitted model supports the hypothesis we tested. For the present example, these odds are roughly 17.9-to-1. Based on common conventions, we might summarize that the evidence for a negative effect is "moderate", though some Bayesian would prefer not to use *any* dichotomizing language like that.
 
 The final part of the Bayesian LM summary contains a number of diagnostics. We won't cover them for now, but the fact that the Rhat's are all very close to 1 indicates that the model has converged and that we have no evidence that the posterior samples contained in the fitted model don't reflect the posterior distribution.
