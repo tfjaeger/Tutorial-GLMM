@@ -7,6 +7,7 @@ library(magrittr)  # pipe!
 library(tufte)     # Tufte-style handout formatting
 library(gganimate) # animation of plots
 library(patchwork)
+library(scatterplot3d)
 
 library(broom)     # working with model output
 library(ggthemes)  # nice themes for plotting

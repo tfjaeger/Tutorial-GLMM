@@ -1,32 +1,35 @@
 ---
 title: "The Linear Model (LM)"
 author: "T. Florian Jaeger"
-date: \today
-geometry: margin=2cm
-header-includes:
-  - \usepackage{animate}
-  - \usepackage{booktabs}
-  - \usepackage{tabto}
-  - \usepackage{soul}
-  - \usepackage{xcolor}
-  - \usepackage{placeins}
-  - \usepackage{lscape}
-  - \newcommand{\blandscape}{\begin{landscape}}
-  - \newcommand{\elandscape}{\end{landscape}}
-  - \makeatletter\renewcommand{\fps@table}{!ht}\makeatother
-  - \setstcolor{red}
-  - \usepackage{sectsty}
-  - \sectionfont{\color{blue}} 
-  - \subsectionfont{\color{blue}}
-  - \subsubsectionfont{\color{darkgray}}
-  - \usepackage{caption}
-  - \usepackage{subcaption}
-  - \usepackage{tikz}
-  - \usepackage{url}
-  - \usetikzlibrary{bayesnet}
-output:
-  tufte::tufte_handout: default
-  fontsize: 10pt
+date: today
+format:
+  pdf:
+    reference-location: margin
+    citation-location: margin
+    include-in-header:
+      text: |
+        \usepackage{animate}
+        \usepackage{booktabs}
+        \usepackage{tabto}
+        \usepackage{soul}
+        \usepackage{xcolor}
+        \usepackage{placeins}
+        \usepackage{lscape}
+        \newcommand{\blandscape}{\begin{landscape}}
+        \newcommand{\elandscape}{\end{landscape}}
+        \makeatletter\renewcommand{\fps@table}{!ht}\makeatother
+        \setstcolor{red}
+        \usepackage{sectsty}
+        \sectionfont{\color{blue}}
+        \subsectionfont{\color{blue}}
+        \subsubsectionfont{\color{darkgray}}
+        \usepackage{caption}
+        \captionsetup{justification=raggedright, singlelinecheck=false}
+        \usepackage{subcaption}
+        \usepackage{tikz}
+        \usepackage{url}
+        \usetikzlibrary{bayesnet}
+    fontsize: 10pt
 urlcolor: blue
 editor_options: 
   markdown: 
@@ -39,44 +42,33 @@ source("constants.R")
 
 # Readings and assignments in *preparation* of this class
 
-\begin{marginfigure}
-  \centering
-  \tikz{ %
-    \node[obs] (outcome) {$y_i$} ; %
-    \factor[above=of outcome] {distribution} {left: \textcolor{gray}{$\mathcal{N}$}} {} {}; %
-    \node[latent, right=of distribution] (sigma) {$\sigma$} ; %
-    \node[det, above=of distribution] (mu) {$\mu_i$} ; %
-    \node[obs, above=of mu] (X) {$x_i$} ; %
-    \node[latent, right=of X] (beta) {$\beta$} ; %
-    % plates
-    \plate[inner sep=0.12cm, xshift=-0.06cm, yshift=0.06cm] {plate1} {(mu) (distribution) (X) (outcome)} {$\forall i=1 \ldots N $}; %
-    \edge {distribution} {outcome} ; %
-    \edge {mu} {distribution} ; %
-    \edge {sigma} {distribution} ; %
-    \edge {X, beta} {mu} ; %
-  }
-  \caption{A graphical model visualization of the linear model, shown here in case you find it helpful. Shaded circles are observable variables. White circles are latent variables. These are the variables that constitute the degrees of freedom of the model, the paramters that are fit to the data. Diamonds shapes indicate variables that are determined by other variables. The index $i = 1, ..., N$ refers identifies the observations (usually, the rows) in your data. Note that $\sigma$, unlike $\mu_i$ is assuemd to be constant across observations. This is the assumption of the homogeneity of variance, which you might have heard of if you're familiar with $t$-tests or ANOVA.}\label{fig:lm}
-
-\end{marginfigure}
+::: {#fig-graphical-model .column-margin}
+```{=latex}
+\centering
+\tikz{ %
+  \node[obs] (outcome) {$y_i$} ; %
+  \factor[above=of outcome] {distribution} {left: \textcolor{gray}{$\mathcal{N}$}} {} {}; %
+  \node[latent, right=of distribution] (sigma) {$\sigma$} ; %
+  \node[det, above=of distribution] (mu) {$\mu_i$} ; %
+  \node[obs, above=of mu] (X) {$x_i$} ; %
+  \node[latent, right=of X] (beta) {$\beta$} ; %
+  % plates
+  \plate[inner sep=0.12cm, xshift=-0.06cm, yshift=0.06cm] {plate1} {(mu) (distribution) (X) (outcome)} {$\forall i=1 \ldots N $}; %
+  \edge {distribution} {outcome} ; %
+  \edge {mu} {distribution} ; %
+  \edge {sigma} {distribution} ; %
+  \edge {X, beta} {mu} ; %
+}
+```
+A graphical model visualization of the linear model, shown here in case you find it helpful. Shaded circles are observable variables. White circles are latent variables. These are the variables that constitute the degrees of freedom of the model, the paramters that are fit to the data. Diamonds shapes indicate variables that are determined by other variables. The index $i = 1, ..., N$ refers identifies the observations (usually, the rows) in your data. Note that $\sigma$, unlike $\mu_i$ is assuemd to be constant across observations. This is the assumption of the homogeneity of variance, which you might have heard of if you're familiar with $t$-tests or ANOVA.
+:::
 
 In preparation for class, please **read *Regression and other stories* (ROS),
-Chapters 6 & 7.1-2**. This text is quite intuitive and assumes comparatively little
-background. But if you find yourself getting lost, please stop and first read or
-watch one of the many more informal introductions to linear models (e.g., [this
-one](https://medium.com/analytics-vidhya/linear-regression-an-intuitive-approach-ded05ed39a87)).
-**You should plan for 2h of reading and summarizing your questions in
-preparation for this week of the class.**
-
-**Optionally:** Before the next meeting, you might find it helpful to read and *work through* this document.
-Please note that this document is providing R code only. Some of the steps
-described here might have less direct solutions in Matlab or Python, so it is
-recommended that you start early.
+Ch. 3.3, Ch. 6-6.3, Ch. 7.1.** Optionally, you can read 6.4-6.5 and 7.2. The final part (7.2) is a great way to consolidate your understanding by following along the simulation code they provide. This text is quite intuitive and assumes comparatively little background. **You should plan for ~3h of reading and summarizing your questions in preparation for this week of the class.**
 
 # About this document
 
-This PDF is generated from an R markdown document (using the \texttt{tufte}
-package for styling). If you're interested in understanding the code that
-generated the examples presented below, you can [clone the
+This PDF is generated from an Quarto markdown document (using the \texttt{tufte} package for styling). If you're interested in understanding the code that generated the examples presented below, you can [clone the
 repo](https://github.com/tfjaeger/Tutorial-GLMM/). Both the PDF and the R
 markdown that the PDF is generated from are in the scripts/ folder. You can go
 through the document line by line, or make changes and 'knit' a new PDF with the
@@ -183,12 +175,12 @@ model (GLMM) that we'll cover in later lectures:[^4]
     take any real value from $-\infty$ to $+\infty$. Equivalently, we can say
     that the *residuals* (or prediction errors) are drawn from a Normal
     distribution (with mean 0).
--   **Equal variance of errors**. While ${\rm E[y] = \mu}$ is assumed to vary
+-   **Equal variance of errors**. While $\mathrm{E}[y] = \mu$ is assumed to vary
     with the predictors $X$, the residual standard deviation around that mean
     $\sigma$ is assumed to be independent of $X$, and thus constant and
     identical across all observations.
 -   **Additivity of effects**. The *effects* of predictors are assumed to be
-    additive: ${\rm E}[y]$ is assumed to be the weighted *sum* of the
+    additive: $\mathrm{E}[y]$ is assumed to be the weighted *sum* of the
     predictors.
 -   **Linearity of each effects**. $y$ is linear in the $\beta$s. That is, the
     *effects* of predictors are assumed to be linear.
@@ -210,9 +202,7 @@ classes.
 
 ## Use of the LM in our field(s)
 
-While the LM can be used as a predictive model---i.e., to make predictions about unseen data---this is not the primary use of the LMin our fields. Rather, we tend to fit an LM (or other regression models) to the sample of data we have collected, and then conduct statistical inferences about the *effects* of one or more of the model's predictors based on the best-fitting parameterization of that model. Best-fitting parameterization refers to the estimates of $\beta$s (and the residual standard deviation $\sigma$, though we don't tend to be interested in this parameter) that make the LM deliver the best predictions about the observed values of $y$.[^6]
-
-[^6]: We'll learn in later lectures what "best" means here, and how those parameters are obtained. For now, we'll assume that those are known, and focus on what they tell us about the effects of the different predictors that are included in the LM.
+While the LM can be used as a predictive model---i.e., to make predictions about unseen data---this is not the primary use of the LMin our fields. Rather, we tend to fit an LM (or other regression models) to the sample of data we have collected, and then conduct statistical inferences about the *effects* of one or more of the model's predictors based on the best-fitting parameterization of that model. Best-fitting parameterization refers to the estimates of $\beta$s (and the residual standard deviation $\sigma$, though we don't tend to be interested in this parameter) that make the LM deliver the best predictions about the observed values of $y$. We'll briefly cover what "best" means in this context in the next section, and we'll return to it in more depth later in the semester.
 
 When we employ an LM during data analysis, we are making the assumption that
 this model describes the relation between the predictors and the outcome in the
@@ -220,6 +210,36 @@ population we seek to study. This also means that all of our conclusions are
 contingent on these assumptions, including in particular the assumption that we
 have considered all relevant variables (or have otherwise ruled out that other
 effects can confound our analysis).
+
+```{r}
+#| label: fig-geometric
+#| echo: false
+#| column: margin
+#| fig-width: 4
+#| fig-height: 8
+#| fig-cap: "Examples of an LM with one continuous predictor (top; the line) and two continuous predictors (bottom; the plane)."
+library(scatterplot3d)
+
+set.seed(42)
+n <- 60
+d_geo1 <- tibble(x1 = runif(n, 0, 10)) %>%
+  mutate(y = 2 + 1.5 * x1 + rnorm(n, 0, 3))
+m_geo1 <- lm(y ~ x1, data = d_geo1)
+
+d_geo2 <- tibble(x1 = runif(n, 0, 10), x2 = runif(n, 0, 10)) %>%
+  mutate(y = 2 + 1.2 * x1 + 0.8 * x2 + rnorm(n, 0, 2))
+m_geo2 <- lm(y ~ x1 + x2, data = d_geo2)
+
+par(mfrow = c(2, 1), mar = c(4, 4, 1, 1))
+plot(d_geo1$x1, d_geo1$y, pch = 16, cex = .7, xlab = expression(x[1]), ylab = "y")
+abline(m_geo1, col = "blue")
+
+s3d <- scatterplot3d(d_geo2$x1, d_geo2$x2, d_geo2$y, pch = 16, angle = 55,
+                      xlab = expression(x[1]), ylab = expression(x[2]), zlab = "y",
+                      color = "black", mar = c(3, 3, 1, 1))
+s3d$plane3d(m_geo2, draw_polygon = TRUE, draw_lines = TRUE,
+            polygon_args = list(col = adjustcolor("lightblue", alpha.f = .5), border = NA))
+```
 
 # Geometric intuitions
 
@@ -233,16 +253,129 @@ For
 instance, for a single predictor, the LM defines a line that describes the
 predicted outcome as a function of the single predictor. For two predictors, the
 LM defines a plane in the 3D space defined by the two predictors and the
-outcome, etc.
+outcome, etc. (for some examples, see @fig-geometric).
 
-Often it is more intuitive, however, to plot the data in fewer dimensions. For
-example, an LM with a continuous predictor, a categorical predictor (factor),
-and their interaction, describes multiple lines (that might differ in slope). An
-LM with a quadratic polynomial of a single continuous input variable will have
-two continuous predictors derived from that input variable. But rather than to
-plot the predictions in 3D space, we can plot them in 2D space, showing the
-effects of both the linear and the quadratic transforms of the input variable
-along a single axis.
+## What makes a line fit well? Residuals, RSS, and likelihood
+
+When we look at @fig-geometric, it seems intuitive that the line/hyperplane provides a relatively good fit to the points. But what does that mean and how can we quantify *goodness-of-fit*? Later in the semester, we'll learn different approaches to this question and how they relate to each other. For now, here's a brief primer in case you're curious, but don't worry if it doesn't yet all make sense.
+
+We illustrate this here for the
+single-predictor case, since it is the easiest to draw. There are two related
+but distinct ideas: (1) a line fits better the smaller its (squared) residuals
+are, and (2) a line fits better the higher the *likelihood* of the observed data
+is under the normal-error assumption of the LM. It turns out that, for LMs, the two approaches are identical and yield the same best-fitting model. 
+
+**Residuals and the residual sum of squares (RSS).** For any candidate line
+$\hat{y}_i = \hat{\alpha} + \hat{\beta}x_i$, the residual for observation $i$ is
+the vertical distance between the predicted and the actual outcome, $y_i - \hat{y}_i$ (the red lines below). Squaring and
+summing these residuals gives the residual sum of squares,
+$RSS = \sum_i (y_i - \hat{y}_i)^2$, an intuitive measure of how 'off' the model's predictions are. The three panels below show the same data
+with three different hypothetical lines: the actual best (least-squares) fit,
+a line with the same slope but shifted down, and a line with the (best-fitting)
+intercept but a different slope. Both of the latter two lines fit clearly worse
+(larger red residuals, larger RSS) than the best-fitting line. The best-fitting line is the one that minimizes the RSS.
+
+**Likelihood under the normal-error assumption.** Recall that the LM assumes
+$y_i \sim \mathcal{N}(\hat\alpha + \hat\beta x_i, \hat\sigma)$: for every value
+of $x$, the model places an *identical-variance* normal distribution around the
+predicted value $\hat{y}$. The fourth panel below visualizes this by drawing a
+few of these normal distributions (in red), rotated so that they sit vertically
+on top of the fit line. For a few example points, the annotated value is the
+*log-density* of that point's observed $y_i$ under its corresponding normal
+distribution, $\log p(y_i \mid \hat\alpha, \hat\beta)$---points close to the line
+fall in the peak of the density (higher, i.e., less negative log-density) than
+points far from the line. Summing the log-densities across all observations
+gives the (log-)likelihood of the data under the fitted line,
+$\Lambda = \sum_i \log p(y_i \mid \hat\alpha, \hat\beta)$. It turns out that,
+for the LM, choosing $\hat\alpha, \hat\beta$ to maximize $\Lambda$---maximizing the model's likelihood---is the *same* as minimizing the RSS---minimzing the summed (squared) prediction error!
+
+```{r rss-likelihood-setup, echo=FALSE}
+library(ggrepel)
+
+set.seed(123)
+n_rss <- 20
+d_rss <- tibble(x = runif(n_rss, 0, 10)) %>%
+  mutate(y = 3 + 1.5 * x + rnorm(n_rss, 0, 2.5))
+m_rss <- lm(y ~ x, data = d_rss)
+alpha_hat <- coef(m_rss)[1]
+beta_hat  <- coef(m_rss)[2]
+sigma_hat <- sigma(m_rss)
+
+base_size <- 11 * 1.15
+x_curve <- seq(1, 9, length.out = 5)
+scale_dens <- 3
+
+# Panel showing one hypothetical line, its residuals, and the resulting RSS
+plot_line_and_rss <- function(alpha, beta, title, bold = FALSE) {
+  d <- d_rss %>% mutate(yhat = alpha + beta * x)
+  rss <- sum((d$y - d$yhat)^2)
+  lab <- paste(deparse(bquote(
+    RSS == sum((y[i] - hat(y)[i])^2, i == 1, n) ~ "=" ~ .(round(rss, 1)))),
+    collapse = " ")
+
+  ggplot(d, aes(x, y)) +
+    geom_segment(aes(xend = x, yend = yhat), color = "red", linewidth = .4) +
+    geom_abline(intercept = alpha, slope = beta, color = "blue") +
+    geom_point(size = 1.5) +
+    annotate("text", x = min(d$x), y = max(d$y) + 1, hjust = 0, vjust = 1,
+             color = "red", size = 3.45, fontface = if (bold) "bold" else "plain",
+             parse = TRUE, label = lab) +
+    labs(title = title, x = "x", y = "y") +
+    coord_cartesian(clip = "off") +
+    theme_bw(base_size = base_size)
+}
+
+# Panel showing normal distributions (in red) centered vertically on the same line
+plot_line_and_loglik <- function(alpha, beta, bold = FALSE) {
+  curve_df <- map_dfr(x_curve, function(xc) {
+    yhat_c <- alpha + beta * xc
+    ygrid <- seq(yhat_c - 3.5 * sigma_hat, yhat_c + 3.5 * sigma_hat, length.out = 200)
+    tibble(x = xc + dnorm(ygrid, mean = yhat_c, sd = sigma_hat) * scale_dens,
+           y = ygrid, group = xc)
+  })
+
+  set.seed(1)
+  d_ann <- d_rss %>%
+    mutate(yhat = alpha + beta * x,
+           logdens = dnorm(y, yhat, sigma_hat, log = TRUE)) %>%
+    slice(sample(seq_len(n_rss), 4)) %>%
+    mutate(lab = map_chr(logdens, ~ paste(
+      deparse(bquote(log * p == .(round(.x, 2)))), collapse = " ")))
+
+  loglik <- sum(dnorm(d_rss$y, alpha + beta * d_rss$x, sigma_hat, log = TRUE))
+  lab_loglik <- paste(deparse(bquote(
+    Lambda == sum(log * p(y[i] * "|" * hat(alpha) * "," * hat(beta)), i == 1, n) ~ "=" ~ .(round(loglik, 1)))),
+    collapse = " ")
+
+  ggplot() +
+    geom_abline(intercept = alpha, slope = beta, color = "blue") +
+    geom_point(data = d_rss, aes(x, y), size = 1.5) +
+    geom_path(data = curve_df, aes(x, y, group = group), color = "red") +
+    geom_point(data = d_ann, aes(x, y), color = "red", size = 1.5) +
+    geom_text_repel(data = d_ann, aes(x, y, label = lab), parse = TRUE,
+              color = "red", size = 3.105, seed = 1,
+              segment.color = NA, max.overlaps = Inf, min.segment.length = Inf) +
+    annotate("text", x = .3, y = max(d_rss$y) + 2, hjust = 0, vjust = 1,
+             color = "red", size = 3.68, fontface = if (bold) "bold" else "plain",
+             parse = TRUE, label = lab_loglik) +
+    labs(x = "x", y = "y") +
+    coord_cartesian(clip = "off") +
+    theme_bw(base_size = base_size)
+}
+
+p_best_rss        <- plot_line_and_rss(alpha_hat, beta_hat, "Best fit", bold = TRUE)
+p_best_loglik     <- plot_line_and_loglik(alpha_hat, beta_hat, bold = TRUE)
+p_shifted_rss     <- plot_line_and_rss(alpha_hat - 8, beta_hat, "Shifted down (same slope)")
+p_shifted_loglik  <- plot_line_and_loglik(alpha_hat - 8, beta_hat)
+p_slope_rss       <- plot_line_and_rss(alpha_hat, beta_hat - 1.2, "Different slope")
+p_slope_loglik    <- plot_line_and_loglik(alpha_hat, beta_hat - 1.2)
+```
+
+```{r rss-likelihood-plot, echo=FALSE, fig.width=10, fig.height=10, fig.cap="Three hypothetical lines for the same data (rows), with the resulting residuals and RSS (left column) and the corresponding normal-likelihood visualization (right column). Points colored in red (right column) are the ones for which the log-density is annotated. The best-fitting line (top row, boldface summary) has the smallest RSS and the highest log-likelihood of the three."}
+(p_best_rss | p_best_loglik) /
+  (p_shifted_rss | p_shifted_loglik) /
+  (p_slope_rss | p_slope_loglik)
+```
 
 # General workflow
 
@@ -303,10 +436,11 @@ can use this workflow section as a general recipe to look up later.
     to the model matrix (more on that in a later lecture). And there are a
     number of other common formula abbreviations that will expand into multiple
     columns in the design matrix. If you're not sure what a formula does, I
-    recommend simply looking at the model matrix it creates. E.g., in R:
+    recommend simply looking at the model matrix it creates (in R, `model.matrix(lm(...))`):
 
-```{r model-matrix, echo=TRUE}
-model.matrix(lm(data = d, formula = Response.RT ~ 1 + Condition * VOT)) %>%
+```{r model-matrix, echo=FALSE}
+model.matrix(
+  lm(data = d, formula = Response.RT ~ 1 + Condition * VOT)) %>%
   # Select 20 random rows from the model matrix for illustration
   as_tibble() %>% 
   slice_sample(n = 15)
@@ -328,7 +462,15 @@ The data come from an experiment on adaptive speech perception, and contain both
 responses and reaction times from a two-alternative forced-choice task (2AFC).
 From the abstract of Tan & Jaeger:
 
-```{r, fig.margin = TRUE, fig.cap = 'The same simple 2AFC task on all trials. Participants started each trial by clicking the green button. A recording played, and {\\bf participants had to answer which of the two words they heard}.', warning=FALSE, message=FALSE, cache=TRUE, out.width="80%"}
+```{r}
+#| warning: false
+#| message: false
+#| echo: false
+#| label: fig-trial
+#| column: margin
+#| fig-width: 3
+#| fig-height: 3
+#| fig-cap: "The same simple 2AFC task on all trials. Participants started each trial by clicking the green button. A recording played, and **participants had to answer which of the two words they heard**."
 knitr::include_graphics("figures/trial_example.png")
 ```
 
@@ -352,7 +494,13 @@ between hearing the word *dip* (lower VOT) and the word *tip* (higher VOT). The
 three between-participant condition differed only in the distribution of VOT
 during exposure blocks.
 
-```{r, fig.fullwidth = TRUE, fig.cap = 'Incremental exposure-test design. Histograms summarize distribution of voice onset time (VOT) in each block (dark bars: "d"-words; light: "t"-words). The three {\\em between-participant} conditions (rows) differed only in the distribution of VOT during exposure blocks. VOTs in test blocks were identical within \\& across conditions.', warning=FALSE, message=FALSE, cache=TRUE, out.width='100%'}
+```{r}
+#| column: page
+#| fig-cap: 'Incremental exposure-test design. Histograms summarize distribution of voice onset time (VOT) in each block (dark bars: "d"-words; light: "t"-words). The three *between-participant* conditions (rows) differed only in the distribution of VOT during exposure blocks. VOTs in test blocks were identical within & across conditions.'
+#| warning: false
+#| message: false
+#| cache: true
+#| out-width: '100%'
 knitr::include_graphics("figures/block_design.png")
 ```
 
@@ -458,9 +606,12 @@ print(lm.bayesian)
 cat(capture.output(print(lm.bayesian)), sep = "\n")
 ```
 
-\begin{marginfigure}
-
-```{r, fig.width=3.5, fig.height=5}
+```{r}
+#| column: margin
+#| fig-width: 3.5
+#| fig-height: 5
+#| fig-cap: "For the present example, the frequentist and Bayesian LM yield similar estimates, and make very similar predictions. The plots show the predicted response RTs as a function of VOT, with 95% confidence intervals (frequentist) or credible intervals. Points show the data."
+#| label: fig-lm-predictions
 p.frequentist <- plot_predictions(lm.frequentist, by = "VOT") + xlab("VOT (ms)") + ylab("Response RT (ms)") + ggtitle("Frequentist LM") + geom_point(data = dd, aes(x = VOT, y = Response.RT), size = .1, color = "black", alpha = .5)
 p.bayesian <- plot_predictions(lm.bayesian, by = "VOT") + xlab("VOT (ms)") + ylab("Response RT (ms)") + ggtitle("Bayesian LM") + geom_point(data = dd, aes(x = VOT, y = Response.RT), size = .1, color = "black", alpha = .5)
 
@@ -468,17 +619,13 @@ p.frequentist /
  p.bayesian
 ```
 
-\caption{For the present example, the frequentist and Bayesian LM yield similar estimates, and make very similar predictions. The plots show the predicted response RTs as a function of VOT, with 95\% confidence intervals (frequentist) or credible intervals. Points show the data.} \label{fig:lm-predictions}
-
-\end{marginfigure}
-
 The specific output will depend on the package you use. For this particular set of functions, the default output of the Bayesian `stan_glm` function is a bit more verbose; it also prints, for instance, the estimate of the residual standard deviation, $\hat{\sigma}_\epsilon$. This information is also present in the frequentist model; it just wasn't plotted as part of the default output:
 
 ```{r, echo=TRUE}
 sigma(lm.frequentist)
 ```
 
-While the estimates of the two models aren't exactly identical, they are quite similar for this example (see also Fig. @\ref(fig:lm-predictions)). This won't always be the case. In later lectures, we'll cover how the choice 
+While the estimates of the two models aren't exactly identical, they are quite similar for this example (see also @fig-lm-predictions). This won't always be the case. In later lectures, we'll cover how the choice 
 of prior for Bayesian models affects the outcomes, why this is sometimes used to criticize Bayesian statistics, and why this criticism can be misguided. For now, we'll focus on the frequentist LM output, which is likely more familiar. We can obtain more information about the fitted model by summarizing it:
 
 
@@ -601,23 +748,57 @@ summary(m)
 ```
 
 ## A Bayesian LM
-Finally, let's return to the Bayesian LM we fit above. We can summarize it in the same way as we did for the frequentist LM:
+Finally, let's return to the Bayesian LM we fit above. We can summarize it in
+the same way as we did for the frequentist LM:
 
 ```{r, echo=T}
 summary(lm.bayesian)
 ```
 
-Again, the first part summarizes the model we fit, the data we fit it to, and some information about how the model was fit. The second part provides estimates of the coefficients, and their standard errors (= the standard deviation of the estimates). Unlike the frequentist model, the Bayesian LM does not provide a $t$-statistic or a $p$-value based on that statistic. In fact, we don't need either of these parametric summaries of the uncertainty we should maintain about the estimate. That's because the model represents this uncertainty in the 4000 posterior samples it has drawn from the posterior distribution of the three parameters of the LM. The quantiles of these posterior samples are summarized in the output of the LM.[^13] These are the posterior samples that we can use to test hypotheses about the parameters of the model, e.g., by asking how many of the posterior samples are above or below 0. For example, we can ask whether RTs decrease with increasing VOT, i.e., whether the coefficient for VOT is negative:
+Again, the first part summarizes the model we fit, the data we fit it to, and
+some information about how the model was fit. The second part provides
+estimates of the coefficients, and their standard errors (= the standard
+deviation of the estimates). Unlike the frequentist model, the Bayesian LM does
+not provide a $t$-statistic or a $p$-value based on that statistic. In fact, we
+don't need either of these parametric summaries of the uncertainty we should
+maintain about the estimate. That's because the model represents this
+uncertainty in the 4000 posterior samples it has drawn from the posterior
+distribution of the three parameters of the LM. The quantiles of these
+posterior samples are summarized in the output of the LM.[^13] These are the
+posterior samples that we can use to test hypotheses about the parameters of
+the model, e.g., by asking how many of the posterior samples are above or below
+0. For example, we can ask whether RTs decrease with increasing VOT, i.e.,
+whether the coefficient for VOT is negative:
 
-[^13]: Note one interesting difference between the Bayesian and frequentist LM that we'll return to in later lectures: in the frequentist LM, estimate of the standard deviation of the residuals $\hat{\sigma}_\epsilon$ is a point estimate---when we obtained `sigma(lm.frequentist)` above, there was no uncertainty associated with that estimate, unlike for the estimates of the intercept and slope of VOT. This is different in the Bayesian LM, in which we obtain the full posterior distribution of $\sigma_\epsilon$ (summarized in terms of its quantiles in the output). Bayesians maintain uncertainty about *all* parameters in the model. 
+[^13]: Note one interesting difference between the Bayesian and frequentist LM
+    that we'll return to in later lectures: in the frequentist LM, estimate of
+    the standard deviation of the residuals $\hat{\sigma}_\epsilon$ is a point
+    estimate---when we obtained `sigma(lm.frequentist)` above, there was no
+    uncertainty associated with that estimate, unlike for the estimates of the
+    intercept and slope of VOT. This is different in the Bayesian LM, in which
+    we obtain the full posterior distribution of $\sigma_\epsilon$ (summarized
+    in terms of its quantiles in the output). Bayesians maintain uncertainty
+    about *all* parameters in the model.
 
 ```{r,echo=T}
 hypothesis(lm.bayesian, "VOT < 0")
 ```
 
-In this case, the hypothesis test tells us that the mean estimate is indeed negative and that and that 95% of the posterior samples are below 0. We also see an evidence ratio---essentially a Bayes Factor, about which we'll learn more later. This evidence ration tells us the odds that a random posterior sample of the 4000 samples in the fitted model supports the hypothesis we tested. For the present example, these odds are roughly 17.9-to-1. Based on common conventions, we might summarize that the evidence for a negative effect is "moderate", though some Bayesian would prefer not to use *any* dichotomizing language like that.
+In this case, the hypothesis test tells us that the mean estimate is indeed
+negative and that and that 95% of the posterior samples are below 0. We also
+see an evidence ratio---essentially a Bayes Factor, about which we'll learn
+more later. This evidence ration tells us the odds that a random posterior
+sample of the 4000 samples in the fitted model supports the hypothesis we
+tested. For the present example, these odds are roughly 17.9-to-1. Based on
+common conventions, we might summarize that the evidence for a negative effect
+is "moderate", though some Bayesian would prefer not to use *any* dichotomizing
+language like that.
 
-The final part of the Bayesian LM summary contains a number of diagnostics. We won't cover them for now, but the fact that the Rhat's are all very close to 1 indicates that the model has converged and that we have no evidence that the posterior samples contained in the fitted model don't reflect the posterior distribution.
+The final part of the Bayesian LM summary contains a number of diagnostics. We
+won't cover them for now, but the fact that the Rhat's are all very close to 1
+indicates that the model has converged and that we have no evidence that the
+posterior samples contained in the fitted model don't reflect the posterior
+distribution.
 
 # Session info
 
