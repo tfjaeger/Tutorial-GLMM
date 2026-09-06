@@ -1,0 +1,195 @@
+---
+title: "Interactions in regression analysis"
+author: "T. Florian Jaeger"
+date: today
+format:
+  pdf:
+    reference-location: margin
+    citation-location: margin
+    include-in-header:
+      text: |
+        \usepackage{booktabs}
+        \usepackage{tabto}
+        \usepackage{soul}
+        \usepackage{xcolor}
+        \usepackage{placeins}
+        \usepackage{lscape}
+        \newcommand{\blandscape}{\begin{landscape}}
+        \newcommand{\elandscape}{\end{landscape}}
+        \makeatletter\renewcommand{\fps@table}{!ht}\makeatother
+        \setstcolor{red}
+        \usepackage{sectsty}
+        \sectionfont{\color{blue}}
+        \subsectionfont{\color{blue}}
+        \subsubsectionfont{\color{darkgray}}
+    fontsize: 10pt
+urlcolor: blue
+---
+
+```{r set-options, include=F}
+source("constants.R")
+```
+
+# Reading and assignments in *preparation* of this class
+
+# The data for this document
+
+This tutorial uses the same data introduced in the [lecture on factor coding](LM-predictor-coding.qmd).
+
+```{r, message=F}
+d <-
+  read_csv("../data/data_ClarkCrowding.csv") %>%
+  mutate_at(c("Subject", "Condition"), factor) %>%
+  filter(Condition != "Fixation") %>%
+  na.omit() %>%
+  droplevels()
+
+contrasts(d$Condition) = cbind("Crowded vs. Uncrowded" = c(.5,-.5))
+
+d %<>%
+  mutate(across(where(is.numeric), list("c" = function(x) x - mean(x))))
+```
+
+# Interactions between factors and continuous predictors
+Next, we expand the analysis further. We remove the additivity assumption. Or rather, the addidivity assumption still holds but we expand the model in a way that we are not assuming the our two predictors are additive. This is done by including an interaction between the two predictors. Here I show this for the case of one continuous predictor (`DiffusionConstant`) and one binary categorical predictor (`Condition`), but the same logic extends to interactions between multiple continuous or multiple categorical predictors, as well as interactions between interactions (e.g., three-way interactions, etc.). Like for the remainder of this tutorial, we focus on the type of planned analysis typical for (or at least the idea of) experimental psychology. For that reason, we do not discuss considerations about when we should even consider an interaction (but see, for example, Harrell, 2001 for insightful discussion, as well as Gelman \& Hill, 2007, p. 36).^[The short of those considerations is that introducing additional complexity (degrees of freedom) increases the risk of overfitting to the data, and with it the risk of spurious/unreliable conclusions. It is thus advisable to include additional complexity in the model only if is is motivated theoretically, by previous work, or other *a priori* considerations. Another specific recommendation you'll see often is to only include interactions if all their components are also included in the model, unless there is a good theoretical reason to do otherwise. These recommendations are not specific to the LM.]
+
+For the case of one continuous and one categorical predictor, the geometric interpretation of the model is that we now allow the two lines (corresponding to the continuous predictor's effect at the two levels of the categorical predictor) to not be parallel. And our question of whether the interaction is *significant* becomes the question whether the difference in the slope of the two lines is statistically different from zero.
+
+We can ask this question by adding a new predictor to the model that is the *product* of the two predictors (cf. Gelman \& Hill, 2007, p. 34-36; James et al., 2013, p. 87-90). We then ask whether this new predictor has a non-zero effect, i.e., we ask whether the coefficient for this new predictor is different from zero. In R, the regression formula for this model is written as (where the colon is the interaction operator):
+
+\ 
+
+`Threshold ~ 1 + Condition + DiffusionConstant + Condition:DiffusionConstant`
+
+\ 
+
+which essentially runs the following model (where I is the identity operator, which return x for x):
+
+\ 
+
+`Threshold ~ 1 + Condition + DiffusionConstant + I(Condition * DiffusionConstant)`
+
+\ 
+
+or shorter (where X1 * X2 is a shorthand for the full-factorial combination of X1 and X2):
+
+\ 
+
+`Threshold ~ 1 + Condition*DiffusionConstant`
+
+\ 
+
+Just like, e.g., factor coding implicit creates an additional numerical variable that encodes the factor's information, the interaction operator implicitly creates a new variable in our data that is the product if the (numerically coded) factor `Condition` and the continuous predictor `DiffusionConstant`. To see this, we again look at the model matrix:
+
+With this change in contrast, the model matrix also changes:
+
+```{r, echo=T}
+model.matrix( ~ 1 + Condition * DiffusionConstant, data = d)
+```
+
+
+
+## Do the effects of condition and difficusion constant interact?
+Now we can fit the new LM with the interaction, and look at the summary of results. We will use the centered diffusion constant for this model---i.e., we'll fit the model:
+
+\ 
+
+`Threshold ~ 1 + Condition * DiffusionConstant_c`
+
+\ 
+
+For this model, we can refer to the effect of condition as the "*main* effect" of condition (the overall, or mean, effect of condition, marginalizing over the effects of diffusion constant). If we didn't center the diffusion constant---and more generally, if there were other uncentered variables in the model---the effect of of condition would not be conventionally referred to as main effect.
+
+```{r}
+l.interaction = lm(Threshold ~ 1 + Condition * DiffusionConstant_c, data = d)
+summary(l.interaction)
+```
+
+The first thing we can notice is that the $R^2$ of the model has barely increased. In other words, adding the interaction doesn't explain much more variance in the outcome. Indeed, the adjusted $R^2$ (which is the $R^2$ corrected for the complexity of the model) has *de*creased. With this in mind, it is not surprising that the interaction does not have a significant effect. In short, we cannot reject the null hypothesis that the effect of the diffusion constant on the threshold is identical for crowded and uncrowded condition. This is also in line with a visualization of the data and the model:
+
+```{r, echo=F, fig.cap="Size (in arcminutes) at which threshold performance (62.5% correct) was reached by diffusion constant (centered) and crowding condition. Each color shows a separate subject. Black lines show the predicted outcome of a linear model fit to the data.", fig.width=4.5, fig.height=4}
+d %>%
+  ggplot(aes(x = DiffusionConstant_c)) +
+  geom_point(aes(y = Threshold, color = Subject, shape = Condition), alpha = .5) +
+  geom_abline(
+    intercept = coef(l.interaction)[1] + .5 * coef(l.interaction)[2],
+    slope = coef(l.interaction)[3] + .5 * coef(l.interaction)[4], 
+    linetype = 1, color = "black") +
+  geom_abline(
+    intercept = coef(l.interaction)[1] - .5 * coef(l.interaction)[2],
+    slope = coef(l.interaction)[3] - .5 * coef(l.interaction)[4], 
+    linetype = 2, color = "black") +
+  theme_bw()
+```
+
+In the LM with the interaction, the main effect of diffusion constant is the *average* effect of the diffusion constant across the two conditions (because we effect-coded and thus centered condition). The main effect of condition is the *average* across all values of the diffusion constant (because we centered the diffusion constant, so that the effect of condition is the predicted distance between the lines when the centered diffusion constant is zero, i.e., at the mean of the diffusion constant). The interaction tells us how much the slope of the diffusion constant differs between the conditions. Specifically, the slope of the diffusion constant for the crowded condition is predicted to be + 0.008665 * 0.05 = + 0.0043325 larger than the main effect of the diffusion constant (0.032167 + 0.0043325), whereas the slope of the diffusion constant for the uncrowded condition is predicted to be + 0.008665 * -0.05 = - 0.0043325 smaller than the main effect of the diffusion constant (0.032167 - 0.0043325).
+
+Note also that the intercept estimate in the interaction model is not identical to the one from the combined model. This seems to contradict what we learned above, that the intercept estimate is the model's prediction for the grand mean if all predictors are centered. Note, however, that we did not center the interaction and, indeed, the mean of the product of condition and DiffusionConstant is *not* 0, but rather
+`r d %>% summarise(mean = mean(DiffusionConstant_c * ifelse(Condition == "Crowded", .5, -.5))) %>% round(3)`.^[Since the diffusion constant is not a variable that we controlled directly by our design, it can have different means for the two conditions even after centering it, and indeed it does (centering only guarantees that the *overall* mean of the diffusion constant is 0): In other words, the diffusion constant is itself affected by the condition and, as a consequence, condition and the diffusion constants are correlated. Here we don't explore this further, but we will return to questions about collinearity later in the semester.]
+
+### Prepare for class 
+ 
+ 1. On Figure 3, draw a line segment that correspond to the intercept. I.e., where along the x-axis does the intercept make a prediction (a vertical line segment) and from where to where along y should the line segment go?
+ 1. On Figure 3, draw a line segment that correspond to the effect of condition.
+ 1. Calculate the slope for the crowded condition from the model output shown above.
+ 1. What's a geometric interpretation of an interaction between two *continuous* predictors (x1 and x2)? For this it might be helpful to first think about the geometric interpretation of two additive continuous predictors (a plane over x1 and x2, the height of which is given along the third axis, y)
+ 1. True or false? Since the interaction does not have a significant effect, we can safely remove it from the model. 
+
+### Discussion questions for class
+
+ 6. True or false? Now that we know that the slope of diffusion constant does not significantly differ between the two crowdedness conditions, and given that the effect of diffusion constant was significant, we can conclude that both conditions exhibit a significant effect of the diffusion constant. 
+ 1. True or false? If we had found a significant interaction between condition and diffusion constant, we could have concluded that the effect of conclusion constant goes in opposite directions for the two conditions? 
+ 1. When we fit the same interaction model with the uncentered diffusion constant instead, we get a seemingly conflicting result, where condition does not longer have a significant effect. Why is that the case? Is this result really conflicting? (The figure might help. Hint: draw the line segments corresponding to the effect of condition in this new interaction model.)
+
+```{r, fig.cap="Size (in arcminutes) at which threshold performance (62.5% correct) was reached by diffusion constant (not-centered) and crowding condition. Each color shows a separate subject. Black lines show the predicted outcome of a linear model fit to the data.", fig.width=4.5, fig.height=4}
+l.temp = lm(Threshold ~ 1 + Condition * DiffusionConstant, data = d)
+summary(l.temp)
+
+d %>%
+  ggplot(aes(x = DiffusionConstant)) +
+  geom_point(aes(y = Threshold, color = Subject, shape = Condition), alpha = .5) +
+  geom_abline(
+    intercept = coef(l.temp)[1] + .5 * coef(l.temp)[2],
+    slope = coef(l.temp)[3] + .5 * coef(l.temp)[4], 
+    linetype = 1, color = "black") +
+  geom_abline(
+    intercept = coef(l.temp)[1] - .5 * coef(l.temp)[2],
+    slope = coef(l.temp)[3] - .5 * coef(l.temp)[4], 
+    linetype = 2, color = "black") +
+  theme_bw() + coord_cartesian(xlim = c(0, 40))
+```
+
+ 1. Are the predicted/fitted values from this model different from the first interaction model we fit above?
+
+
+## Simple effects
+When we have interactions in our model, we might also want to report the *simple effects*. For example, for the two-way interaction between condition and diffusion constant, we might want to report the simple effect of the diffusion constant for each condition. That's necessary because a significant interaction between two predictors $x_1$ and $x_2$ only tells us that the effect of $x_1$ on $y$ differs depending on $x_2$ (or vice versa, that the effect of $x_2$ on $y$ depends on the value of $x_1$). For example, for the present case a significant interaction would have indicated that the slope of diffusion constant differs between the two crowdedness conditions.
+
+**However, a significant interaction does *not* easily tell us *how* the interacting effects depends on each other** (it actually does, but not in a way that's very easy to read from the model). For example, for the present case a significant interaction could indicate that there is a significant positive relation between the diffusion constant and threshold in one condition and a significant negative relation in the other condition; but it could also indicate that there is a significant positive relation in one condition and a non-significant relation in the other; or even that the relation is significant and positive in both conditions but the size of the effect of diffusion constant differs between condition (and so on). To address which of those scenarios holds, it is necessary to conduct additional analyses. The standard approach to that is called simple effect analyses.
+
+In this approach, we do not split the data into the two conditions and fit separate models (`Threshold ~ 1 + DiffusionConstant`) to it. Rather, we use all of the data we have and simple re-parameterize/recode the same LM we have already fit to read out the simple effects of `DiffusionConstant` at each level of condition. In R, this can be done with the convenient embedding operator `/`. Here's the model matrix resulting from this operator does for the present case:
+
+```{r, echo=T}
+model.matrix( ~ 1 + Condition / DiffusionConstant_c, data = d)
+```
+
+and here is the resulting LM:
+
+```{r}
+summary(lm(Threshold ~ 1 + Condition / DiffusionConstant_c, data = d))
+```
+
+This re-parameterization does not change the predicted/fitted responses of the model (not shown here) or the model fit ($R^2$, F-statistic, etc.; shown). But we now are provided with the effect of the diffusion constant at each level of the condition variable. In this case, we see that the effect of diffusion constant on the threshold is significant and positive in both conditions.
+
+
+## Writing up the analysis results
+
+\color{lightgray}
+We analyzed the data with a linear regression, using the function \texttt{lm} from the \texttt{base} package (citation with version) of the software \texttt{R} (citation with version). We calculated each subject's mean thresholds for the crowded and uncrowded condition. These 20 threshold values were regressed against condition (deviation-coded: .5 = *crowded* vs. -.5 = *uncrowded*), the diffusion constant **(centered), and their interaction**. We found a statistically significant **main** effect of condition ($\widehat{\beta}=.442, t=4.697, p<.01$), so that subjects reach threshold performance at larger sizes in the crowded condition, compared to the uncrowded condition. We also found a statistically significant effect of the diffusion constant ($\widehat{\beta}=.037, t=5.846, p<.01$), so that larger diffusion constants required larger sizes to achieve threshold performance. **The interaction was not significant ($\widehat{\beta} = 0.009, p > .5$).**^[\color{black}Note that we usually don't report the simple effects unless the interaction was significant.]
+\color{black}
+
+<!-- # Session info
+
+```{r session_info, include=TRUE, echo=TRUE, results='markup'}
+devtools::session_info()
+``` -->

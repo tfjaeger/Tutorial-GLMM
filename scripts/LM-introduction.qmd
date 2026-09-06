@@ -1,5 +1,6 @@
 ---
 title: "The Linear Model (LM)"
+subtitle: "An applied introduction to the linear model and its interpretation"
 author: "T. Florian Jaeger"
 date: today
 format:
@@ -800,8 +801,8 @@ indicates that the model has converged and that we have no evidence that the
 posterior samples contained in the fitted model don't reflect the posterior
 distribution.
 
-# Session info
+<!-- # Session info
 
 ```{r session_info, include=TRUE, echo=TRUE, results='markup'}
 devtools::session_info()
-```
+``` -->
