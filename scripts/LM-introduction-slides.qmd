@@ -1,0 +1,224 @@
+---
+title: "The Linear Model (LM)"
+subtitle: "Key ideas in 15 minutes"
+author: T. Florian Jaeger
+format:
+  beamer:
+    aspectratio: 169
+    navigation: empty
+knitr:
+  opts_chunk:
+    R.options:
+      width: 200
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE, warning = FALSE, message = FALSE,
+  cache = TRUE, fig.align = "center")
+```
+
+```{r libraries, include=FALSE}
+source("constants.R")
+library(scatterplot3d)
+```
+
+## The linear model, in one picture
+
+::::: columns
+::: {.column width="55%"}
+- $y$ is a draw from a Normal distribution
+- its mean is a **weighted sum** of the predictors
+- its standard deviation $\sigma$ is **constant**
+:::
+
+::: {.column width="45%"}
+$$
+y_i \sim \mathcal{N}(\underbrace{\alpha + \beta_1 x_{1,i} + ... + \beta_k x_{k,i}}_{\mu_i},\ \sigma)
+$$
+:::
+:::::
+
+## Why should you care?
+
+- LMs (& friends: $t$-tests, ANOVA, GLMs, GLMMs) are the workhorse of our field(s)
+- Fitting one means estimating $\hat\alpha, \hat\beta_1, ..., \hat\beta_k, \hat\sigma$
+- Everything else we'll cover this semester builds on this model
+
+## Four core assumptions
+
+- **Independence** of observations
+- **Normality** of the residuals
+- **Equal variance** of the residuals (homoscedasticity)
+- **Additivity & linearity** of effects
+
+. . .
+
+Violations of *independence*, *normality*, or *homoscedasticity* can invalidate your inferences. Violations of *linearity* are often (partially) fixable by transforming predictors.
+
+## Geometrically: a line, a plane, a hyperplane
+
+```{r fig.width=8.5, fig.height=4}
+set.seed(42)
+n <- 60
+d1 <- tibble(x1 = runif(n, 0, 10)) %>% mutate(y = 2 + 1.5 * x1 + rnorm(n, 0, 3))
+m1 <- lm(y ~ x1, data = d1)
+
+d2 <- tibble(x1 = runif(n, 0, 10), x2 = runif(n, 0, 10)) %>%
+  mutate(y = 2 + 1.2 * x1 + 0.8 * x2 + rnorm(n, 0, 2))
+m2 <- lm(y ~ x1 + x2, data = d2)
+
+par(mfrow = c(1, 2), mar = c(4, 4, 2, 1))
+plot(d1$x1, d1$y, pch = 16, cex = .8, xlab = expression(x[1]), ylab = "y", main = "One predictor")
+abline(m1, col = "blue", lwd = 2)
+
+s3d <- scatterplot3d(d2$x1, d2$x2, d2$y, pch = 16, angle = 55,
+                      xlab = expression(x[1]), ylab = expression(x[2]), zlab = "y",
+                      main = "Two predictors", color = "black")
+s3d$plane3d(m2, draw_polygon = TRUE, draw_lines = TRUE,
+            polygon_args = list(col = adjustcolor("lightblue", .5), border = NA))
+```
+
+With $k$ predictors: a hyperplane in $k+1$ dimensions.
+
+## What makes a line fit well?
+
+::::: columns
+::: {.column width="50%"}
+**Residual sum of squares**
+
+$$RSS = \sum_i (y_i - \hat y_i)^2$$
+
+smaller RSS $\rightarrow$ better fit
+:::
+
+::: {.column width="50%"}
+**Likelihood**
+
+$$\Lambda = \sum_i \log p(y_i \mid \hat\alpha,\hat\beta)$$
+
+higher $\Lambda$ $\rightarrow$ better fit
+:::
+:::::
+
+. . .
+
+For the LM, minimizing $RSS$ $\equiv$ maximizing $\Lambda$.
+
+## Same idea, side by side
+
+```{r fig.width=9, fig.height=4.3}
+set.seed(123)
+n_rss <- 20
+d_rss <- tibble(x = runif(n_rss, 0, 10)) %>% mutate(y = 3 + 1.5 * x + rnorm(n_rss, 0, 2.5))
+m_rss <- lm(y ~ x, data = d_rss)
+alpha_hat <- coef(m_rss)[1]; beta_hat <- coef(m_rss)[2]; sigma_hat <- sigma(m_rss)
+
+rss <- sum((d_rss$y - (alpha_hat + beta_hat * d_rss$x))^2)
+lab_rss <- paste(deparse(bquote(RSS ~"="~ .(round(rss, 1)))), collapse = " ")
+
+p_rss <- ggplot(d_rss, aes(x, y)) +
+  geom_segment(aes(xend = x, yend = alpha_hat + beta_hat * x), color = "red") +
+  geom_abline(intercept = alpha_hat, slope = beta_hat, color = "blue", linewidth = 1) +
+  geom_point(size = 2) +
+  annotate("text", x = 0, y = max(d_rss$y) + 1, hjust = 0, vjust = 1, color = "red",
+           size = 5, fontface = "bold", parse = TRUE, label = lab_rss) +
+  labs(x = "x", y = "y") + coord_cartesian(clip = "off") + theme_bw(base_size = 16)
+
+x_curve <- seq(1, 9, length.out = 5)
+curve_df <- map_dfr(x_curve, function(xc) {
+  yhat_c <- alpha_hat + beta_hat * xc
+  ygrid <- seq(yhat_c - 3.5 * sigma_hat, yhat_c + 3.5 * sigma_hat, length.out = 200)
+  tibble(x = xc + dnorm(ygrid, yhat_c, sigma_hat) * 3, y = ygrid, group = xc)
+})
+loglik <- sum(dnorm(d_rss$y, alpha_hat + beta_hat * d_rss$x, sigma_hat, log = TRUE))
+lab_ll <- paste(deparse(bquote(Lambda ~"="~ .(round(loglik, 1)))), collapse = " ")
+
+p_ll <- ggplot() +
+  geom_abline(intercept = alpha_hat, slope = beta_hat, color = "blue", linewidth = 1) +
+  geom_point(data = d_rss, aes(x, y), size = 2) +
+  geom_path(data = curve_df, aes(x, y, group = group), color = "red") +
+  annotate("text", x = 0, y = max(d_rss$y) + 1, hjust = 0, vjust = 1, color = "red",
+           size = 5, fontface = "bold", parse = TRUE, label = lab_ll) +
+  labs(x = "x", y = "y") + coord_cartesian(clip = "off") + theme_bw(base_size = 16)
+
+p_rss + p_ll
+```
+
+## A worked example
+
+- Data: reaction times (RT) in a 2AFC task, as a function of VOT
+- One participant, 72 trials
+- Question: does VOT *predict* RT?
+
+```{r}
+d <- read.csv("../data/Tan-Jaeger.csv") %>%
+  filter(!is.na(Response.Voicing)) %>%
+  mutate(across(c(ParticipantID, Block, Condition.Exposure), factor),
+         Response.t = ifelse(Response.Voicing == "voiceless", 1, 0)) %>%
+  rename(VOT = Item.VOT, Condition = Condition.Exposure) %>%
+  mutate(Response.isT = ifelse(Response.Voicing == "voiceless", T, F))
+
+dd <- d %>%
+  filter(Condition == "Shift40", Phase == "test") %>%
+  filter(ParticipantID == first(ParticipantID)) %>%
+  select(ParticipantID, Condition, Phase, Block, Trial, VOT, Response.isT, Response.RT)
+```
+
+## Fitting the LM
+
+```{r, echo=TRUE}
+lm.frequentist <- lm(Response.RT ~ 1 + VOT, data = dd)
+coef(summary(lm.frequentist))
+```
+
+- $\hat\beta_{VOT} = `r round(coef(lm.frequentist)[2], 1)`$, $t = `r round(coef(summary(lm.frequentist))[2,3], 2)`$, $p = `r round(coef(summary(lm.frequentist))[2,4], 2)`$
+- Not (quite) significant here
+
+## Frequentist $\approx$ Bayesian (for this example)
+
+```{r, include=FALSE, cache=TRUE}
+lm.bayesian <- stan_glm(Response.RT ~ 1 + VOT, data = dd, refresh = 0)
+```
+
+```{r fig.width=8, fig.height=4}
+p.f <- plot_predictions(lm.frequentist, by = "VOT") +
+  ggtitle("Frequentist") + xlab("VOT (ms)") + ylab("RT (ms)") +
+  geom_point(data = dd, aes(VOT, Response.RT), size = .3, alpha = .5) +
+  theme_bw(base_size = 15)
+p.b <- plot_predictions(lm.bayesian, by = "VOT") +
+  ggtitle("Bayesian") + xlab("VOT (ms)") + ylab("RT (ms)") +
+  geom_point(data = dd, aes(VOT, Response.RT), size = .3, alpha = .5) +
+  theme_bw(base_size = 15)
+p.f + p.b
+```
+
+## Reading the output
+
+- **Coefficients**: $\hat\beta$, its uncertainty, and (frequentist) a $t$/$p$-value
+- **Residual SD**: $\hat\sigma_\epsilon$ (how noisy is $y$ around the line?)
+- $R^2$: how much variance is explained
+- Bayesian: no $p$-value---instead, the full posterior (e.g., % of samples \< 0)
+
+## Writing it up
+
+> "We used linear regression to regress RT against VOT. The effect of VOT was not significant ($\hat\beta = -7.6$, $t = -1.67$, $p \geq .1$)."
+
+- Report the estimate **and** a plain-language interpretation
+- Use $\hat\beta$ (not $\beta$) --- it's an *estimate*
+- Don't equate "significant" with "large effect"
+
+## Writing it up (Bayesian)
+
+> "We used a Bayesian linear regression to regress RT against VOT, with weakly regularizing priors ($\mathcal{N}(0, 2.5)$). There was *moderate* evidence that RTs decreased with increasing VOT ($\hat\beta = -7.6$, 95%-CI= $[-16.7, 1.7]$; BF = 17.9)."
+
+- Report the **posterior** (e.g., its mean/median and credible interval)
+- No $p$-value --- instead, summarize the posterior directly (e.g., % \< 0, an evidence ratio/Bayes factor)
+- Avoid dichotomous ("significant"/"not significant") language
+
+## Take-aways
+
+- LM: $y \sim \mathcal{N}(X\beta, \sigma)$ --- a line/plane/hyperplane + normal noise
+- Fitting = minimizing $RSS$ = maximizing likelihood $\Lambda$
+- Same model, two frameworks (frequentist / Bayesian) --- often similar answers
+- Next: predictor coding, then GLMs & GLMMs
