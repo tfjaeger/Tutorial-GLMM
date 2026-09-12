@@ -1,6 +1,6 @@
 ---
 title: "Categorical predictors in regression analysis"
-subtitle: "An applied tutorial on factor coding and its interpretation for continuous and categorical predictors in linear regression"
+subtitle: "Factor coding and its interpretation in linear regression"
 author: "T. Florian Jaeger"
 date: today
 format:
@@ -31,14 +31,20 @@ urlcolor: blue
 source("constants.R")
 ```
 
-# Reading and assignments in *preparation* of this class
+# Reading and preparation for this class
 Please read Gelman et al. "Regression and Other Stories" (ROS) Ch. 7.3. If you want to challenge yourself, go through problem sets 7.1 and 7.9. Then read and *work through* this document. We will use class to go through the important concepts and to address any questions that you have about the readings or the problem sets in this document. 
 
 In this document, you will find sections labeled "Prepare for class". Please work through those examples and write up your answers. If there are a few questions, you cannot answer, elicit help on the slack channel. In addition, there are sections called "Discussion questions for class". Please think about these questions, but don't worry if you get stuck. These are some questions we can go through during class.
 
-**Please note that this document provides R code only.** Some of the steps described here might have less direct solutions in Matlab, so it is recommended that you start early. I have, however, tried to describe each step in a way that does not depend on R or Matlab. 
-
 **Optionally**, you can read Schad, Vasishth, Hohenstein, & Klieg (2020). It is an exhaustive summary of different contrast coding schemes and their implications for regression analysis. It's rather small-stepped and really walks you through all kinds of different scenarios you might encounter. But it's also very long. In any case, I would definitely store it in your library for later reference---it's the type of paper you might want to look up when you get to analyze your own data and find yourself wondering how you should code your variables. Another good reference is James et al. (2013, Ch 3.3 up to but *not* incl. 3.3.3). 
+
+# About this document
+
+This PDF is generated from an Quarto markdown document. If you're interested in understanding the code that generated the examples presented below, you can [clone the
+repo](https://github.com/tfjaeger/Tutorial-GLMM/). Both the PDF and the R
+markdown that the PDF is generated from are in the scripts/ folder. You can go
+through the document line by line, or make changes and 'knit' a new PDF with the
+press of a button. You can also submit corrections or suggestions for improvements as a pull request to the GitHub repository.
 
 # The data for this document
 
@@ -62,7 +68,7 @@ For this tutorial we wil use Ashley Clark's data from her experiment on visual c
 Crowding is a visual phenomenon that has puzzled scientists for decades; an object in isolation can be perceived without problems, yet surrounding it with similar objects makes it harder to see. While crowding has been studied extensively in the visual periphery, humans normally orient objects in their center of gaze, the high-acuity region of the retina called the foveola. While the foveola is less than 1.5mm wide (or ~1 visual deg2), it contains more cones than rest of the retina combined. Human’s ability to actively perceive the visual world relies heavily on not only the foveola itself, but also how and where the eye is positioned. The few studies that have examined crowding within foveal vision have produced contradictory results. Some reasons for these discrepancies include using relatively large stimuli, a small number of participants, abnormal stimuli presentation, and having indefinite stimulus presentation times with no eye tracking. More recent research, however, has highlighted the importance of precise eye tracking due to the eye’s constant movement during even fixation. These small and constant movements of the eye, called fixational eye movements (FEMs), are beneficial or both high acuity vision, as well as daily tasks such as reading and face recognition. FEM’s have never been examined in the context of crowding, and it remains unknown how individuals in previous crowding studies directed their foveola over stimuli, or even maintained fixation.
 
 ## Goals
-The goals of this research are to (1) investigate the effect of crowding within the foveola, and (2) examine if and how fixational eye movements influence crowding at this scale. Based on previous research, we hypothesize that crowding will be detrimental to foveal vision, as it is in peripheral vision, but on a finer scale. Further, based on the recent findings that FEMs are beneficial for high-acuity vision, I expect a relationship between FEMs and the strength of crowding within the foveola, with larger and less precise FEMs increasing the negative effects visual crowding.
+The goals of this research are to (1) investigate the effect of crowding within the foveola, and (2) examine if and how fixational eye movements influence crowding at this scale. Based on previous research, we hypothesize that crowding will be detrimental to foveal vision, as it is in peripheral vision, but on a finer scale. Further, based on the recent findings that FEMs are beneficial for high-acuity vision, we expect that the quality of fixational eye movements will modulate the strength of crowding within the foveola. Specifically, we predict that smaller, more precise FEMs will reduce crowding effects, while larger, less precise FEMs will increase them.
 
 ## Methods
 Studying FEMs during visual crowding within the foveola requires high-precision eye tracking and accuracy in localizing the center of gaze. Current video eye trackers do not have the required spatial precision, as the error of gaze localization is as large as the foveola itself. However, by using a custom built state-of-the-art eye tracking system with arcminute precision, we will be able to examine exactly how FEMs contribute to crowding within the foveola. Stimuli consist of a number-font designed specifically for studying crowding in the fovea, as it allows for recognition even when numbers are closer together than traditional optotypes used in other crowding studies.6 Two conditions will be examined, the uncrowded (where a single number is presented), and the crowded (where the same size number is presented, but with four surrounding numbers). The size of the number and spacing between the numbers in the crowded condition change throughout the experiment based on the subject’s performance using an adaptive procedure. The stimuli presented will vary in size, ranging from 0.5 arcminutes to 4 arcminutes in width. To determine the number-width threshold, we use a standard psychophysics procedure measuring the width of the stimulus at which a subject performs above chance level.
@@ -85,7 +91,7 @@ d %>%
 # Code predictors explicitly!
 If we want to include qualitative/categorical predictors (i.e., *factors*, e.g., "Condition A" vs. "Condition B") in an LM, we need to translate these predictors into numerical variables.[^0] This process is sometimes called predictor or factor *coding*. Some people use this term narrowly to only refer to the coding of categorical predictors. Others use it to refer to any changes or transformation we make to our predictors, including continuous predictors (e.g. centering or scaling). In this tutorial, we talk about both.
 
-[^0]: In R, the \texttt{contrasts()} function and the family of \texttt{contr.*}
+[^0]: In R, the `contrasts()` function and the family of `contr.*`
     functions are very helpful for factor coding (a process also known as contrast coding),
     without having the manually transform columns in your data table into numerical values. This
     approach means that the factors in the data table remain factors (allowing
@@ -258,7 +264,7 @@ Finally, for any non-trivial model, I highly recommend the use of a summary tabl
 Here is a rather detailed write-up for the model with the deviation-coded condition variable. In many scenarios (e.g., if the units of the outcome variable are not necessarily informative), you might decide to provide less detail:
 
 \color{lightgray}
-We analyzed the data with a linear regression, using the function \texttt{lm} from the \texttt{base} package (citation with version) of the software \texttt{R} (citation with version). We calculated each subject's mean thresholds for the crowded and uncrowded condition. These 20 threshold values were regressed against condition (deviation-coded: .5 = *crowded* vs. -.5 = *uncrowded*). We found a statistically significant main effect of condition ($\widehat{\beta}=.576, t=3.657, p<.01$), so that subjects reached threshold performance at a size that was about half an arcminute larger in the crowded condition (mean = `r  reduce(tidy(l.deviation)[["estimate"]], .f = function(x, y) round(x + .5 * y, 3))`), compared to the uncrowded condition (mean = `r  reduce(tidy(l.deviation)[["estimate"]], .f = function(x, y) round(x - .5 * y, 3))`).
+We analyzed the data with a linear regression, using the function `lm` from the `base` package (citation with version) of the software `R` (citation with version). We calculated each subject's mean thresholds for the crowded and uncrowded condition. These 20 threshold values were regressed against condition (deviation-coded: .5 = *crowded* vs. -.5 = *uncrowded*). We found a statistically significant main effect of condition ($\widehat{\beta}=.576, t=3.657, p<.01$), so that subjects reached threshold performance at a size that was about half an arcminute larger in the crowded condition (mean = `r  reduce(tidy(l.deviation)[["estimate"]], .f = function(x, y) round(x + .5 * y, 3))`), compared to the uncrowded condition (mean = `r  reduce(tidy(l.deviation)[["estimate"]], .f = function(x, y) round(x - .5 * y, 3))`).
 \color{black}
 
 
@@ -308,7 +314,7 @@ d %>%
 Here's a somewhat less detailed write-up for our two-predictor model, building on the example provided above:
 
 \color{lightgray}
-We analyzed the data with a linear regression, using the function \texttt{lm} from the \texttt{base} package (citation with version) of the software \texttt{R} (citation with version). We calculated each subject's mean thresholds for the crowded and uncrowded condition. These 20 threshold values were regressed against condition (deviation-coded: .5 = *crowded* vs. -.5 = *uncrowded*) **and the diffusion constant**. We found a statistically significant effect of condition ($\widehat{\beta}=.431, t=4.738, p<.01$), so that subjects reach threshold performance at larger sizes in the crowded condition, compared to the uncrowded condition. **We also found a statistically significant effect of the diffusion constant ($\widehat{\beta}=.035, t=6.373, p<.01$), so that larger diffusion constants required larger sizes to achieve threshold performance.**
+We analyzed the data with a linear regression, using the function `lm` from the `base` package (citation with version) of the software `R` (citation with version). We calculated each subject's mean thresholds for the crowded and uncrowded condition. These 20 threshold values were regressed against condition (deviation-coded: .5 = *crowded* vs. -.5 = *uncrowded*) **and the diffusion constant**. We found a statistically significant effect of condition ($\widehat{\beta}=.431, t=4.738, p<.01$), so that subjects reach threshold performance at larger sizes in the crowded condition, compared to the uncrowded condition. **We also found a statistically significant effect of the diffusion constant ($\widehat{\beta}=.035, t=6.373, p<.01$), so that larger diffusion constants required larger sizes to achieve threshold performance.**
 \color{black}
 
 ### Prepare for class

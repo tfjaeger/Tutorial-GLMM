@@ -5,15 +5,14 @@ library(tidyverse) # gotta be tidy
 library(magrittr)  # pipe!
 
 library(tufte)     # Tufte-style handout formatting
+library(ggthemes)  # nice themes for plotting
 library(gganimate) # animation of plots
 library(patchwork)
 library(scatterplot3d)
 
 library(broom)     # working with model output
-library(ggthemes)  # nice themes for plotting
-
-library(brms)
-library(rstanarm)
+library(brms)      # Bayesian regression models using Stan
+library(rstanarm)  # Bayesian regression models using Stan
 library(marginaleffects)
 
 # set R markdown formatting

@@ -69,11 +69,11 @@ Ch. 3.3, Ch. 6-6.3, Ch. 7.1.** Optionally, you can read 6.4-6.5 and 7.2. The fin
 
 # About this document
 
-This PDF is generated from an Quarto markdown document (using the \texttt{tufte} package for styling). If you're interested in understanding the code that generated the examples presented below, you can [clone the
+This PDF is generated from an Quarto markdown document. If you're interested in understanding the code that generated the examples presented below, you can [clone the
 repo](https://github.com/tfjaeger/Tutorial-GLMM/). Both the PDF and the R
 markdown that the PDF is generated from are in the scripts/ folder. You can go
 through the document line by line, or make changes and 'knit' a new PDF with the
-press of a button.
+press of a button. You can also submit corrections or suggestions for improvements as a pull request to the GitHub repository.
 
 # The linear model (LM)
 
@@ -264,119 +264,7 @@ We illustrate this here for the
 single-predictor case, since it is the easiest to draw. There are two related
 but distinct ideas: (1) a line fits better the smaller its (squared) residuals
 are, and (2) a line fits better the higher the *likelihood* of the observed data
-is under the normal-error assumption of the LM. It turns out that, for LMs, the two approaches are identical and yield the same best-fitting model. 
-
-**Residuals and the residual sum of squares (RSS).** For any candidate line
-$\hat{y}_i = \hat{\alpha} + \hat{\beta}x_i$, the residual for observation $i$ is
-the vertical distance between the predicted and the actual outcome, $y_i - \hat{y}_i$ (the red lines below). Squaring and
-summing these residuals gives the residual sum of squares,
-$RSS = \sum_i (y_i - \hat{y}_i)^2$, an intuitive measure of how 'off' the model's predictions are. The three panels below show the same data
-with three different hypothetical lines: the actual best (least-squares) fit,
-a line with the same slope but shifted down, and a line with the (best-fitting)
-intercept but a different slope. Both of the latter two lines fit clearly worse
-(larger red residuals, larger RSS) than the best-fitting line. The best-fitting line is the one that minimizes the RSS.
-
-**Likelihood under the normal-error assumption.** Recall that the LM assumes
-$y_i \sim \mathcal{N}(\hat\alpha + \hat\beta x_i, \hat\sigma)$: for every value
-of $x$, the model places an *identical-variance* normal distribution around the
-predicted value $\hat{y}$. The fourth panel below visualizes this by drawing a
-few of these normal distributions (in red), rotated so that they sit vertically
-on top of the fit line. For a few example points, the annotated value is the
-*log-density* of that point's observed $y_i$ under its corresponding normal
-distribution, $\log p(y_i \mid \hat\alpha, \hat\beta)$---points close to the line
-fall in the peak of the density (higher, i.e., less negative log-density) than
-points far from the line. Summing the log-densities across all observations
-gives the (log-)likelihood of the data under the fitted line,
-$\Lambda = \sum_i \log p(y_i \mid \hat\alpha, \hat\beta)$. It turns out that,
-for the LM, choosing $\hat\alpha, \hat\beta$ to maximize $\Lambda$---maximizing the model's likelihood---is the *same* as minimizing the RSS---minimzing the summed (squared) prediction error!
-
-```{r rss-likelihood-setup, echo=FALSE}
-library(ggrepel)
-
-set.seed(123)
-n_rss <- 20
-d_rss <- tibble(x = runif(n_rss, 0, 10)) %>%
-  mutate(y = 3 + 1.5 * x + rnorm(n_rss, 0, 2.5))
-m_rss <- lm(y ~ x, data = d_rss)
-alpha_hat <- coef(m_rss)[1]
-beta_hat  <- coef(m_rss)[2]
-sigma_hat <- sigma(m_rss)
-
-base_size <- 11 * 1.15
-x_curve <- seq(1, 9, length.out = 5)
-scale_dens <- 3
-
-# Panel showing one hypothetical line, its residuals, and the resulting RSS
-plot_line_and_rss <- function(alpha, beta, title, bold = FALSE) {
-  d <- d_rss %>% mutate(yhat = alpha + beta * x)
-  rss <- sum((d$y - d$yhat)^2)
-  lab <- paste(deparse(bquote(
-    RSS == sum((y[i] - hat(y)[i])^2, i == 1, n) ~ "=" ~ .(round(rss, 1)))),
-    collapse = " ")
-
-  ggplot(d, aes(x, y)) +
-    geom_segment(aes(xend = x, yend = yhat), color = "red", linewidth = .4) +
-    geom_abline(intercept = alpha, slope = beta, color = "blue") +
-    geom_point(size = 1.5) +
-    annotate("text", x = min(d$x), y = max(d$y) + 1, hjust = 0, vjust = 1,
-             color = "red", size = 3.45, fontface = if (bold) "bold" else "plain",
-             parse = TRUE, label = lab) +
-    labs(title = title, x = "x", y = "y") +
-    coord_cartesian(clip = "off") +
-    theme_bw(base_size = base_size)
-}
-
-# Panel showing normal distributions (in red) centered vertically on the same line
-plot_line_and_loglik <- function(alpha, beta, bold = FALSE) {
-  curve_df <- map_dfr(x_curve, function(xc) {
-    yhat_c <- alpha + beta * xc
-    ygrid <- seq(yhat_c - 3.5 * sigma_hat, yhat_c + 3.5 * sigma_hat, length.out = 200)
-    tibble(x = xc + dnorm(ygrid, mean = yhat_c, sd = sigma_hat) * scale_dens,
-           y = ygrid, group = xc)
-  })
-
-  set.seed(1)
-  d_ann <- d_rss %>%
-    mutate(yhat = alpha + beta * x,
-           logdens = dnorm(y, yhat, sigma_hat, log = TRUE)) %>%
-    slice(sample(seq_len(n_rss), 4)) %>%
-    mutate(lab = map_chr(logdens, ~ paste(
-      deparse(bquote(log * p == .(round(.x, 2)))), collapse = " ")))
-
-  loglik <- sum(dnorm(d_rss$y, alpha + beta * d_rss$x, sigma_hat, log = TRUE))
-  lab_loglik <- paste(deparse(bquote(
-    Lambda == sum(log * p(y[i] * "|" * hat(alpha) * "," * hat(beta)), i == 1, n) ~ "=" ~ .(round(loglik, 1)))),
-    collapse = " ")
-
-  ggplot() +
-    geom_abline(intercept = alpha, slope = beta, color = "blue") +
-    geom_point(data = d_rss, aes(x, y), size = 1.5) +
-    geom_path(data = curve_df, aes(x, y, group = group), color = "red") +
-    geom_point(data = d_ann, aes(x, y), color = "red", size = 1.5) +
-    geom_text_repel(data = d_ann, aes(x, y, label = lab), parse = TRUE,
-              color = "red", size = 3.105, seed = 1,
-              segment.color = NA, max.overlaps = Inf, min.segment.length = Inf) +
-    annotate("text", x = .3, y = max(d_rss$y) + 2, hjust = 0, vjust = 1,
-             color = "red", size = 3.68, fontface = if (bold) "bold" else "plain",
-             parse = TRUE, label = lab_loglik) +
-    labs(x = "x", y = "y") +
-    coord_cartesian(clip = "off") +
-    theme_bw(base_size = base_size)
-}
-
-p_best_rss        <- plot_line_and_rss(alpha_hat, beta_hat, "Best fit", bold = TRUE)
-p_best_loglik     <- plot_line_and_loglik(alpha_hat, beta_hat, bold = TRUE)
-p_shifted_rss     <- plot_line_and_rss(alpha_hat - 8, beta_hat, "Shifted down (same slope)")
-p_shifted_loglik  <- plot_line_and_loglik(alpha_hat - 8, beta_hat)
-p_slope_rss       <- plot_line_and_rss(alpha_hat, beta_hat - 1.2, "Different slope")
-p_slope_loglik    <- plot_line_and_loglik(alpha_hat, beta_hat - 1.2)
-```
-
-```{r rss-likelihood-plot, echo=FALSE, fig.width=10, fig.height=10, fig.cap="Three hypothetical lines for the same data (rows), with the resulting residuals and RSS (left column) and the corresponding normal-likelihood visualization (right column). Points colored in red (right column) are the ones for which the log-density is annotated. The best-fitting line (top row, boldface summary) has the smallest RSS and the highest log-likelihood of the three."}
-(p_best_rss | p_best_loglik) /
-  (p_shifted_rss | p_shifted_loglik) /
-  (p_slope_rss | p_slope_loglik)
-```
+is under the normal-error assumption of the LM. It turns out that, for LMs, the two approaches are identical and yield the same best-fitting model. For more details, see this [tutorial on fitting the LM](https://github.com/tfjaeger/Tutorial-GLMM/scripts/LM-fitting.pdf).
 
 # General workflow
 
@@ -800,6 +688,9 @@ won't cover them for now, but the fact that the Rhat's are all very close to 1
 indicates that the model has converged and that we have no evidence that the
 posterior samples contained in the fitted model don't reflect the posterior
 distribution.
+
+# What next?
+Next, you could either learn more about [how frequentist LMs are fit](https://github.com/tfjaeger/Tutorial-GLMM/scripts/LM-fitting.pdf) or you could learn [how to code and interpret the effects of categorical predictors in an LM](https://github.com/tfjaeger/Tutorial-GLMM/scripts/LM-predictor-coding.pdf).
 
 <!-- # Session info
 

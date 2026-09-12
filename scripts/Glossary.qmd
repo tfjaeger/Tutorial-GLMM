@@ -24,9 +24,9 @@ header-includes:
   - \usepackage{tikz}
   - \usepackage{url}
   - \usetikzlibrary{bayesnet}
-output:
-  tufte::tufte_handout: default
-  fontsize: 10pt
+format:
+  pdf: default
+fontsize: 10pt
 urlcolor: blue
 ---
 

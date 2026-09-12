@@ -173,7 +173,7 @@ coef(summary(lm.frequentist))
 ```
 
 - $\hat\beta_{VOT} = `r round(coef(lm.frequentist)[2], 1)`$, $t = `r round(coef(summary(lm.frequentist))[2,3], 2)`$, $p = `r round(coef(summary(lm.frequentist))[2,4], 2)`$
-- Not (quite) significant here
+- Not significant here
 
 ## Frequentist $\approx$ Bayesian (for this example)
 
@@ -221,4 +221,4 @@ p.f + p.b
 - LM: $y \sim \mathcal{N}(X\beta, \sigma)$ --- a line/plane/hyperplane + normal noise
 - Fitting = minimizing $RSS$ = maximizing likelihood $\Lambda$
 - Same model, two frameworks (frequentist / Bayesian) --- often similar answers
-- Next: predictor coding, then GLMs & GLMMs
+- Next: predictor coding & interactions. Then LLMs & GLMMs.

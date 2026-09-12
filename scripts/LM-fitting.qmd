@@ -1,0 +1,551 @@
+---
+title: "Fitting the Linear Model (LM)"
+subtitle: "Minimizing prediction error or maximizing likelihood"
+author: "T. Florian Jaeger"
+date: today
+format:
+  pdf:
+    reference-location: margin
+    citation-location: margin
+    include-in-header:
+      text: |
+        \usepackage{animate}
+        \usepackage{booktabs}
+        \usepackage{tabto}
+        \usepackage{soul}
+        \usepackage{xcolor}
+        \usepackage{placeins}
+        \usepackage{lscape}
+        \newcommand{\blandscape}{\begin{landscape}}
+        \newcommand{\elandscape}{\end{landscape}}
+        \makeatletter\renewcommand{\fps@table}{!ht}\makeatother
+        \setstcolor{red}
+        \usepackage{sectsty}
+        \sectionfont{\color{blue}}
+        \subsectionfont{\color{blue}}
+        \subsubsectionfont{\color{darkgray}}
+        \usepackage{caption}
+        \usepackage{subcaption}
+        \usepackage{tikz}
+        \usepackage{url}
+        \usetikzlibrary{bayesnet}
+    fontsize: 10pt
+urlcolor: blue
+editor_options: 
+  markdown: 
+    wrap: 80
+---
+
+```{r set-options, include=F}
+source("constants.R")
+```
+
+# Readings and assignments in *preparation* of this class
+
+In preparation for class, please **read *Regression and other stories* (ROS), 
+Chapters 8.1**. This text is quite intuitive and assumes comparatively little
+background. 
+
+**Optionally:** Before the next meeting, you might find it helpful to read and *work through* this document. 
+
+# About this document
+
+This PDF is generated from an Quarto markdown document. If you're interested in understanding the code that generated the examples presented below, you can [clone the
+repo](https://github.com/tfjaeger/Tutorial-GLMM/). Both the PDF and the R
+markdown that the PDF is generated from are in the scripts/ folder. You can go
+through the document line by line, or make changes and 'knit' a new PDF with the
+press of a button. You can also submit corrections or suggestions for improvements as a pull request to the GitHub repository.
+
+# The linear model (LM)
+
+::: {#fig-graphical-model .column-margin}
+```{=latex}
+\centering
+\tikz{ %
+  \node[obs] (outcome) {$y_i$} ; %
+  \factor[above=of outcome] {distribution} {left: \textcolor{gray}{$\mathcal{N}$}} {} {}; %
+  \node[latent, right=of distribution] (sigma) {$\sigma$} ; %
+  \node[det, above=of distribution] (mu) {$\mu_i$} ; %
+  \node[obs, above=of mu] (X) {$x_i$} ; %
+  \node[latent, right=of X] (beta) {$\beta$} ; %
+  % plates
+  \plate[inner sep=0.12cm, xshift=-0.06cm, yshift=0.06cm] {plate1} {(mu) (distribution) (X) (outcome)} {$\forall i=1 \ldots N $}; %
+  \edge {distribution} {outcome} ; %
+  \edge {mu} {distribution} ; %
+  \edge {sigma} {distribution} ; %
+  \edge {X, beta} {mu} ; %
+}
+```
+A graphical model visualization of the linear model, shown here in case you find it helpful. Shaded circles are observable variables. White circles are latent variables. These are the variables that constitute the degrees of freedom of the model, the paramters that are fit to the data. Diamonds shapes indicate variables that are determined by other variables. The index $i = 1, ..., N$ refers identifies the observations (usually, the rows) in your data. Note that $\sigma$, unlike $\mu_i$ is assuemd to be constant across observations. This is the assumption of the homogeneity of variance, which you might have heard of if you're familiar with $t$-tests or ANOVA.
+:::
+
+Recall the linear model in @fig-graphical-model and the specific LM we fit to a single participant from [Tan & Jaeger (2025)](https://www.sciencedirect.com/science/article/pii/S0010027725001350): 
+
+```{r}
+d <- 
+  read.csv("../data/Tan-Jaeger.csv") %>%
+  # Remove catch trials
+  filter(!is.na(Response.Voicing)) %>%
+  # Some variable typing
+  mutate(
+    across(c(ParticipantID, Block, Condition.Exposure), factor),
+    Response.t = ifelse(Response.Voicing == "voiceless", 1, 0)) %>%
+  rename(VOT = Item.VOT, Condition = Condition.Exposure) %>%
+  # making response variable a little easier to understand for non-language scientists
+  mutate(Response.isT = ifelse(Response.Voicing == "voiceless", T, F)) 
+
+dd <- 
+  d %>% 
+  filter(
+    Condition == "Shift40",
+    Phase == "test") %>%
+  filter(ParticipantID == first(ParticipantID)) %>%
+  # select only the columns of the data that are relevant for this tutorial
+  select(ParticipantID, Condition, Phase, Block, Trial, VOT, Response.isT, Response.RT) 
+
+m <- lm(formula = Response.RT ~ 1 + VOT, data = dd)
+summary(m)
+```
+
+We'll go through an example of how this model was fit. We'll start with the perhaps most intuitive fitting algorithm, the *least-square fitting* algorithm. We'll then show how this is equivalent to a more general approach, *likelihood maximization*, which can be used to fit many other types of models.
+
+# Minimizing the prediction error: Least-squares
+
+How did the model fitting algorithm arrive at the estimates and what do they
+present? What do the standard errors (SEs) of the estimates represent?
+Intuitively, we know that the estimates are the "best-fitting" estimates for the
+coefficients. What this means depends on how the goodness of fit is calculated.
+
+One way to find the best-fitting estimates for the coefficients of an LM is to
+minimize the total prediction error. For each observation in our data, the
+prediction error or *residual* of the model $m$ is defined as the difference
+between the predicted value of $y$, $\mathrm{E}_m[y]$, and the actually observed
+value of $y$, i.e., $residual = y - \mathrm{E}_m[y]$. Since we don't want negative
+and positive prediction errors (resulting from over- and under-predicting $y$,
+respectively) to cancel each other out, we cannot simply sum those prediction
+errors to get an estimate of how well the model fits our data. Instead, we sum
+the squared residuals, giving us the residual sum of squares (RSS).[^12] Finding
+the best-fitting estimates then becomes identical to finding the estimates
+that minimize the RSS.
+
+[^12]: One could instead use any other function that would result in only
+    positive prediction errors (e.g., taking the *absolute* prediction error).
+    However, using the squared residuals has both appealing properties, and---for LMs---it
+    turns out to have a close relation to maximizing the likelihood of the
+    model, which we discuss below.
+
+To better understand what happens when we find the best-fitting estimates by
+minimizing the RSS, let's define a few function that help use deliver
+predictions just like the final LM presented above does, but for arbitrary
+intercept values $a$ and arbitrary slope values $b$ for the effect of VOT We
+also define a function that gets the prediction error for each observation in
+our data, and a function that sums up the squared prediction error:
+
+```{r, echo=TRUE}
+get_prediction <- function(a, b, data = dd) {
+  a + b * dd$VOT
+}
+
+get_prediction_error <- function(a, b, data = dd) {
+  dd$Response.RT - get_prediction(a, b, data = data)
+}
+
+get_RSS <- function(a, b, data = dd) {
+  sum(get_prediction_error(a, b, data = data)^2)
+}
+```
+
+Now we can use these functions to visualize the predictions and calculate the
+RSSs for different hypotheses about $a$ and $b$, as shown in Figure @fig-animation. You can use Acrobat Viewer to animate through the following examples (PDF system preview typically won't
+work).
+
+```{r animation-frames, include=FALSE, fig.show='hold'}
+plot_prediction <- function(a, b, data = dd) {
+  RSS <- get_RSS(a, b, data)
+  
+  data %>%
+    ggplot(aes(x = VOT, y = Response.RT)) +
+    geom_point(alpha = .3) +
+    geom_abline(aes(intercept = a, slope = b), color = "blue") +
+    annotate(
+      geom = "text",
+      label = deparse(bquote("E[y]"== .(as.numeric(a))+.(as.numeric(b))*x)),
+      parse = T,
+      x = 85, y = 5000, hjust = 1, color = "blue", size = 6) +
+    annotate(
+      geom = "label", 
+      label = deparse(bquote(RSS == .(RSS))), 
+      parse = T,
+      x = 85, y = 0, hjust = 1, vjust = 0, color = "orange", size = 6) +
+    xlab("VOT (msecs)") + ylab("Response RT")
+}
+
+# plot prediction for best fit
+plot_prediction(coef(m)[1], coef(m)[2])
+
+# plot predictions for halved or doubled intercept
+plot_prediction(coef(m)[1] / 2, coef(m)[2])
+plot_prediction(coef(m)[1] * 2, coef(m)[2])
+
+# plot predictions for zero or inverted slope
+plot_prediction(coef(m)[1], coef(m)[2] * 0)
+plot_prediction(coef(m)[1], coef(m)[2] * -1)
+```
+
+::: {#fig-animation}
+
+```{=latex}
+\centering
+\animategraphics[width=0.8\linewidth,controls,loop]{1}{LM-fitting_files/figure-pdf/animation-frames-}{1}{5}
+```
+Raw RTs for one participant across the six test blocks (points), along with prediction lines for different intercepts $a$ and slopes $b$ for the model RT $\sim$ 1 + VOT. Compare how the RSS changes, depending on $a$ and $b$.
+:::
+
+Figure @fig-rss visualizes the RSS---i.e., the function we're trying to
+minimize---depending on the a wide range of values for $a$ and $b$. This
+illustrates two things. First, the estimates provided by the LM at the start of
+this section indeed minimize the RSS of the model. Second, RSS are a convex
+function of the parameters in the model (here $a$ and $b$), with a single
+optimum. This very appealing property of LMs allows for efficient fitting
+algorithms that are *guaranteed* to converge within an arbitrary finite number
+of steps against the optimal parameters. Basically, it means that going downhill
+is bound to get you closer to the optimum, rather than stuck in a local minimum
+(as can be the case for more complex optimization problems, e.g,. for many types
+of non-linear models).
+
+```{r}
+#| label: fig-rss
+#| echo: false
+#| fig.height: 4
+#| fig.width: 4
+#| out.width: "66%"
+#| fig.cap: "RSS for the model `RT` ~ `1 + VOT`, depending on its intercept $a$ and slope $b$. The white point shows that location of the estimates given in the LM output at the beginning of this section."
+# get RSS for a grid of a and b
+d.rss <- 
+  crossing(
+    a = coef(m)[1] * seq(-10, 10, .1),
+    b = coef(m)[2] * seq(-10, 10, .1)) %>%
+  mutate(RSS = map2_dbl(a, b, ~ get_RSS(.x, .y, dd)))
+
+d.rss %>%
+  ggplot(aes(x = a, y = b)) +
+  geom_tile(aes(fill = RSS)) +
+  geom_point(color = "white", x = coef(m)[1], y = coef(m)[2]) +
+  xlab("intercept a") + ylab("slope b of VOT") +
+  scale_fill_viridis_b(trans = "log10") +
+  coord_cartesian(expand = FALSE) +
+  theme(legend.position = "top", legend.key.width=unit(1,"cm"))
+```
+
+```{r, fig.height=4, fig.width=4, out.width="66%"}
+# Plot RSS at edges of CI
+# 
+# last_plot() +
+#   annotate(
+#     geom = "linerange",
+#     orientation = "y",
+#     y = as.numeric(coef(m)[2]),
+#     xmin = qnorm(.025, coef(summary(m))[1,1], coef(summary(m))[1,2]),
+#     xmax = qnorm(.975, coef(summary(m))[1,1], coef(summary(m))[1,2]),
+#     color = "white") +
+#   annotate(
+#     geom = "linerange",
+#     x = as.numeric(coef(m)[1]),
+#     ymin = qnorm(.025, coef(summary(m))[2,1], coef(summary(m))[2,2]),
+#     ymax = qnorm(.975, coef(summary(m))[2,1], coef(summary(m))[2,2]),
+#     color = "white") +
+#   annotate(
+#     geom = "text",
+#     x = as.numeric(coef(m)[1]),
+#     y = qnorm(.025, coef(summary(m))[2,1], coef(summary(m))[2,2]),
+#     label = round(d.rss[
+#       d.rss$a == d.rss$a[which.min(abs(d.rss$a - qnorm(.025, coef(summary(m))[2,1], coef(summary(m))[2,2])))] &
+#       d.rss$b == d.rss$b[which.min(abs(d.rss$b - as.numeric(coef(m)[1])))],]$RSS),
+#     vjust = 1, color = "white") +
+#   annotate(
+#     geom = "text",
+#     x = as.numeric(coef(m)[1]),
+#     y = qnorm(.975, coef(summary(m))[2,1], coef(summary(m))[2,2]),
+#     label = round(d.rss[
+#       d.rss$a == d.rss$a[which.min(abs(d.rss$a - qnorm(.975, coef(summary(m))[2,1], coef(summary(m))[2,2])))] &
+#       d.rss$b == d.rss$b[which.min(abs(d.rss$b - as.numeric(coef(m)[1])))],]$RSS),
+#     vjust = 0, color = "white") +
+#   annotate(
+#     geom = "text",
+#     x = qnorm(.025, coef(summary(m))[1,1], coef(summary(m))[1,2]),
+#     y = as.numeric(coef(m)[2]),
+#     label = round(d.rss[
+#       d.rss$a == d.rss$a[which.min(abs(d.rss$a - qnorm(.025, coef(summary(m))[1,1], coef(summary(m))[1,2])))] &
+#       d.rss$b == d.rss$b[which.min(abs(d.rss$b - as.numeric(coef(m)[2])))],]$RSS),
+#     hjust = 1, color = "white") +
+#   annotate(
+#     geom = "text",
+#     x = qnorm(.975, coef(summary(m))[1,1], coef(summary(m))[1,2]),
+#     y = as.numeric(coef(m)[2]),
+#     label = round(d.rss[
+#       d.rss$a == d.rss$a[which.min(abs(d.rss$a - qnorm(.975, coef(summary(m))[1,1], coef(summary(m))[1,2])))] &
+#       d.rss$b == d.rss$b[which.min(abs(d.rss$b - as.numeric(coef(m)[2])))],]$RSS),
+#     hjust = 0, color = "white") +
+#   coord_cartesian(
+#     xlim = 
+#       qnorm(.5, coef(summary(m))[1,1], coef(summary(m))[1,2]) +
+#       (range(
+#         qnorm(.025, coef(summary(m))[1,1], coef(summary(m))[1,2]),
+#         qnorm(.975, coef(summary(m))[1,1], coef(summary(m))[1,2])) - 
+#          qnorm(.5, coef(summary(m))[1,1], coef(summary(m))[1,2])) * 2,
+#     ylim = 
+#       qnorm(.5, coef(summary(m))[2,1], coef(summary(m))[2,2]) + 
+#       (range(
+#         qnorm(.025, coef(summary(m))[2,1], coef(summary(m))[2,2]),
+#         qnorm(.975, coef(summary(m))[2,1], coef(summary(m))[2,2])) - 
+#          qnorm(.5, coef(summary(m))[2,1], coef(summary(m))[2,2])) * 2)
+```
+
+Here's an example of how one can use a general optimizer to find the
+best-fitting estimates for an LM. The example uses R's `optim()` function
+but you can try to implement it in your preferred programming language.[^13] You
+can compare its output to the estimates reported at the start of the section:
+
+[^13]: By default, `optim()` uses Quasi-Newtonian optimization. This
+    works just fine for the present purpose.
+
+```{r, echo=F, results='hide'}
+# let's store the optimizer's steps in a data.frame
+d.trace <- tibble(.rows = 0)
+
+o <- 
+  optim(
+    # Starting values for a and b
+    par = c(0, 0), 
+    fn = function(x) {
+      rss <- get_RSS(x[1], x[2]);
+      # Uncomment this line to see how optim() searches the parameter space
+      # message(paste0("a = ", x[1], ", b = ", x[2], "; RSS = ", rss, "\n")) 
+      # <<- assigns values to *global* variables (outside the function)
+      d.trace <<- d.trace %>% bind_rows(tibble(a = x[1], b = x[2], RSS = rss))
+      return(rss)
+    })
+
+# print optimal parameters found by optim()
+print(o$par)
+```
+
+```{r}
+#| label: fig-trace
+#| warning: false
+#| echo: false
+#| column: margin
+#| fig-width: 3
+#| fig-height: 3
+#| fig-cap: "Same as above but zoomed in and showing the path of the optimizer superimposed. Labels show step of optimizer"
+
+# add row numbers
+d.trace %<>%
+  mutate(step = as.numeric(row.names(.)))
+
+last_plot() + 
+  geom_path(
+    data = d.trace, 
+    color = "lightgray") +
+  geom_label(
+    data = d.trace %>% slice(c(1, 30, 60, 90, 120)),
+    aes(label = step),
+    color = "darkgray") +
+  coord_cartesian(xlim = range(d.trace$a), ylim = range(d.trace$b))
+```
+
+```{r, echo=T}
+# let's store the optimizer's steps in a data.frame
+d.trace <- tibble(.rows = 0)
+
+o <- 
+  optim(
+    # Starting values for a and b
+    par = c(0, 0), 
+    fn = function(x) {
+      rss <- get_RSS(x[1], x[2]);
+      # Uncomment this line to see how optim() searches the parameter 
+      # space message(paste0("a = ", x[1], ", b = ", x[2], "; RSS = ", 
+      # rss, "\n")) 
+      d.trace <<- 
+        d.trace %>% 
+        bind_rows(tibble(a = x[1], b = x[2], RSS = rss))
+      return(rss)
+    })
+
+# print optimal parameters found by optim()
+print(o$par)
+```
+
+# Maximizing the likelihood
+
+While minimization of RSS works well for LMs, there is a more generally
+applicable approach that yields the same results for LMs but also can be used
+for the fitting of many others types of models, *likelihood maximization*. Under
+this approach, we find the best-fitting estimates that maximize the likelihood
+of the observed outcomes $y$. Recall that the LM assumes $y$ to be normally
+distributed around the predicted $\mathrm{E}[y]$. This means we can calculate the
+*likelihood* of each observation under the hypothesized normal distribution.
+This normal distribution is a function of the hypothesized values for all the
+model's coefficients ($a$ and $b$ in the example above) *and* the value
+hypothesized for $\  sigma$. For any hypothesis about $a$, $b$, and $\sigma$, we
+can get the density of an observation $y$ under $\mathcal{N}(a + bx, \sigma)$.
+By multiplying the densities of all observations, we can get the data likelihood
+under the hypothesized values for $a$, $b$, and $\sigma$. In practice, we
+instead sum the log-transformed likelihoods. This is numerically more stable,
+and the $x$ that maximizes $\log(f(x))$ is the same that maximizes $f(x)$.
+
+## Want to challenge yourself? Apply what you learned
+Before we go on, you can give the following a try. Implement the likelihood maximization for the LM, following the approach given for RSS above:
+
+-   Define a function that calculates the sum of log-densities for the model
+    `RT` $\sim$ `1 + VOT` given a set of arguments $a$, $b$, and
+    $\sigma$.[^14]
+
+-   Make a figure like the one shown above for RSS. For this figure set $\sigma$
+    to the $\sigma$ from the LM at the start of this section.[^15] We don't
+    expect the likelihood values to be identical to the RSS values---they are on
+    completely different scales. But do the surfaces have similar shapes
+    (curvatures)?
+
+-   To further understand the relationship between OLS and ML fitting of linear
+    regression with normally distributed residuals, see [this presentation,
+    slides 99-122](https://faculty.washington.edu/cadolph/mle/topic2.p.pdf)
+    (it's a lot of slides but that's just because each derivation step is
+    presented as a separate slide).
+
+[^14]: In R, `dnorm()` will give you the density of an observation or
+    vector of observations $y$ under a Normal with the specified mean and
+    standard deviations. Use the optional argument `log = TRUE` to get
+    log densities.
+
+[^15]: In R, use `sigma()` to extract $\sigma$ from an LM.
+
+# Summary
+To recap, there are two related
+but distinct approaches to fitting an LM: (1) a line fits better the smaller its (squared) residuals are, and (2) a line fits better the higher the *likelihood* of the observed data
+is under the normal-error assumption of the LM. It turns out that, for LMs, the two approaches are identical and yield the same best-fitting model. To be specific, the two approaches yield identical estimates for the regression coefficients (here: $\hat{\alpha}$ and $\hat{\beta}$).^[Likelihood maximization yields biased estimates of the residual standard deviation. This is not an issue usually since we do not tend to be interested in the residual standard deviation itself. The bias is also easy to correct (for LMs).]
+
+**Residuals and the residual sum of squares (RSS).** For any candidate line
+$\hat{y}_i = \hat{\alpha} + \hat{\beta}x_i$, the residual for observation $i$ is
+the vertical distance between the predicted and the actual outcome, $y_i - \hat{y}_i$ (the red lines below). Squaring and
+summing these residuals gives the residual sum of squares,
+$RSS = \sum_i (y_i - \hat{y}_i)^2$, an intuitive measure of how 'off' the model's predictions are. The three left panels of @fig-rss-likelihood show the same data
+with three different hypothetical lines: the actual best (least-squares) fit,
+a line with the same slope but shifted down, and a line with the (best-fitting)
+intercept but a different slope. Both of the latter two lines fit clearly worse
+(larger red residuals, larger RSS) than the best-fitting line. The best-fitting line is the one that minimizes the RSS.
+
+**Likelihood under the normal-error assumption.** Recall that the LM assumes
+$y_i \sim \mathcal{N}(\hat\alpha + \hat\beta x_i, \hat\sigma)$: for every value
+of $x$, the model places an *identical-variance* normal distribution around the
+predicted value $\hat{y}$. The panels on the right side of @fig-rss-likelihood visualizes this by drawing a
+few of these normal distributions (in red), rotated so that they sit vertically
+on top of the fit line. For a few example points, the annotated value is the
+*log-density* of that point's observed $y_i$ under its corresponding normal
+distribution, $\log p(y_i \mid \hat\alpha, \hat\beta, \hat\sigma)$---points close to the line
+fall in the peak of the density (higher, i.e., less negative log-density) than
+points far from the line. Summing the log-densities across all observations
+gives the (log-)likelihood of the data under the fitted line,
+$\Lambda = \sum_i \log p(y_i \mid \hat\alpha, \hat\beta, \hat\sigma)$. For this example, I've held 
+$\sigma$ constant at the value estimated through the `lm()` function.
+
+```{r rss-likelihood-setup, echo=FALSE}
+library(ggrepel)
+
+set.seed(123)
+n_rss <- 20
+d_rss <- tibble(x = runif(n_rss, 0, 10)) %>%
+  mutate(y = 3 + 1.5 * x + rnorm(n_rss, 0, 2.5))
+m_rss <- lm(y ~ x, data = d_rss)
+alpha_hat <- coef(m_rss)[1]
+beta_hat  <- coef(m_rss)[2]
+sigma_hat <- sigma(m_rss)
+
+base_size <- 11 * 1.15
+x_curve <- seq(1, 9, length.out = 5)
+scale_dens <- 3
+
+# Panel showing one hypothetical line, its residuals, and the resulting RSS
+plot_line_and_rss <- function(alpha, beta, title, bold = FALSE) {
+  d <- d_rss %>% mutate(yhat = alpha + beta * x)
+  rss <- sum((d$y - d$yhat)^2)
+  lab <- paste(deparse(bquote(
+    RSS == sum((y[i] - hat(y)[i])^2, i == 1, n) ~ "=" ~ .(round(rss, 1)))),
+    collapse = " ")
+
+  ggplot(d, aes(x, y)) +
+    geom_segment(aes(xend = x, yend = yhat), color = "red", linewidth = .4) +
+    geom_abline(intercept = alpha, slope = beta, color = "blue") +
+    geom_point(size = 1.5) +
+    annotate("text", x = min(d$x), y = max(d$y) + 1, hjust = 0, vjust = 1,
+             color = "red", size = 3.45, fontface = if (bold) "bold" else "plain",
+             parse = TRUE, label = lab) +
+    labs(title = title, x = "x", y = "y") +
+    coord_cartesian(clip = "off") +
+    theme_bw(base_size = base_size)
+}
+
+# Panel showing normal distributions (in red) centered vertically on the same line
+plot_line_and_loglik <- function(alpha, beta, bold = FALSE) {
+  curve_df <- map_dfr(x_curve, function(xc) {
+    yhat_c <- alpha + beta * xc
+    ygrid <- seq(yhat_c - 3.5 * sigma_hat, yhat_c + 3.5 * sigma_hat, length.out = 200)
+    tibble(x = xc + dnorm(ygrid, mean = yhat_c, sd = sigma_hat) * scale_dens,
+           y = ygrid, group = xc)
+  })
+
+  set.seed(1)
+  d_ann <- d_rss %>%
+    mutate(yhat = alpha + beta * x,
+           logdens = dnorm(y, yhat, sigma_hat, log = TRUE)) %>%
+    slice(sample(seq_len(n_rss), 4)) %>%
+    mutate(lab = map_chr(logdens, ~ paste(
+      deparse(bquote(log * p == .(round(.x, 2)))), collapse = " ")))
+
+  loglik <- sum(dnorm(d_rss$y, alpha + beta * d_rss$x, sigma_hat, log = TRUE))
+  lab_loglik <- paste(deparse(bquote(
+    Lambda == sum(log * p(y[i] * "|" * hat(alpha) * "," * hat(beta)), i == 1, n) ~ "=" ~ .(round(loglik, 1)))),
+    collapse = " ")
+
+  ggplot() +
+    geom_abline(intercept = alpha, slope = beta, color = "blue") +
+    geom_point(data = d_rss, aes(x, y), size = 1.5) +
+    geom_path(data = curve_df, aes(x, y, group = group), color = "red") +
+    geom_point(data = d_ann, aes(x, y), color = "red", size = 1.5) +
+    geom_text_repel(data = d_ann, aes(x, y, label = lab), parse = TRUE,
+              color = "red", size = 3.105, seed = 1,
+              segment.color = NA, max.overlaps = Inf, min.segment.length = Inf) +
+    annotate("text", x = .3, y = max(d_rss$y) + 2, hjust = 0, vjust = 1,
+             color = "red", size = 3.68, fontface = if (bold) "bold" else "plain",
+             parse = TRUE, label = lab_loglik) +
+    labs(x = "x", y = "y") +
+    coord_cartesian(clip = "off") +
+    theme_bw(base_size = base_size)
+}
+
+p_best_rss        <- plot_line_and_rss(alpha_hat, beta_hat, "Best fit", bold = TRUE)
+p_best_loglik     <- plot_line_and_loglik(alpha_hat, beta_hat, bold = TRUE)
+p_shifted_rss     <- plot_line_and_rss(alpha_hat - 8, beta_hat, "Shifted down (same slope)")
+p_shifted_loglik  <- plot_line_and_loglik(alpha_hat - 8, beta_hat)
+p_slope_rss       <- plot_line_and_rss(alpha_hat, beta_hat - 1.2, "Different slope")
+p_slope_loglik    <- plot_line_and_loglik(alpha_hat, beta_hat - 1.2)
+```
+
+```{r}
+#| label: fig-rss-likelihood
+#| echo: false
+#| fig-width: 10
+#| fig-height: 10
+#| fig-cap: "Three hypothetical lines for the same data (**rows**), with the resulting residuals and RSS (**left** column) and the corresponding normal-likelihood visualization (**right** column). Points colored in red (right column) are the ones for which the log-density is annotated. The best-fitting line (top row, boldface summary) has the smallest RSS and the highest log-likelihood of the three."
+(p_best_rss | p_best_loglik) /
+  (p_shifted_rss | p_shifted_loglik) /
+  (p_slope_rss | p_slope_loglik)
+```
+
+
+<!-- # Session info
+
+```{r session_info, include=TRUE, echo=TRUE, results='markup'}
+devtools::session_info()
+``` -->
