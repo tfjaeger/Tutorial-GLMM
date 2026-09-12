@@ -30,12 +30,21 @@ urlcolor: blue
 source("constants.R")
 ```
 
-# Reading and assignments in *preparation* of this class
+# Reading and assignments in preparation of this class
+In preparation for class, please read *Regression and other stories* (ROS),
+Ch. 10 (10.1-10.5). **You should plan for ~3h of reading and summarizing your questions in preparation for this week of the class.**
+
+# About this document
+
+This PDF is generated from an Quarto markdown document. If you're interested in understanding the code that generated the examples presented below, you can [clone the
+repo](https://github.com/tfjaeger/Tutorial-GLMM/). Both the PDF and the R
+markdown that the PDF is generated from are in the scripts/ folder. You can go
+through the document line by line, or make changes and 'knit' a new PDF with the
+press of a button. You can also submit corrections or suggestions for improvements as a pull request to the GitHub repository.
 
 # The data for this document
 
-This tutorial uses the same data introduced in the [lecture on factor coding](LM-predictor-coding.qmd).
-
+This tutorial uses the same data introduced in the [tutorial on factor coding](http://github.com/tfjaeger/Tutorial-GLMM/blob/main/scripts/LM-predictor-coding.qmd). 
 ```{r, message=F}
 d <-
   read_csv("../data/data_ClarkCrowding.csv") %>%
@@ -44,16 +53,18 @@ d <-
   na.omit() %>%
   droplevels()
 
-contrasts(d$Condition) = cbind("Crowded vs. Uncrowded" = c(.5,-.5))
+contrasts(d$Condition) = cbind("Crowded vs. mean" = c(.5,-.5))
 
 d %<>%
   mutate(across(where(is.numeric), list("c" = function(x) x - mean(x))))
 ```
 
 # Interactions between factors and continuous predictors
-Next, we expand the analysis further. We remove the additivity assumption. Or rather, the addidivity assumption still holds but we expand the model in a way that we are not assuming the our two predictors are additive. This is done by including an interaction between the two predictors. Here I show this for the case of one continuous predictor (`DiffusionConstant`) and one binary categorical predictor (`Condition`), but the same logic extends to interactions between multiple continuous or multiple categorical predictors, as well as interactions between interactions (e.g., three-way interactions, etc.). Like for the remainder of this tutorial, we focus on the type of planned analysis typical for (or at least the idea of) experimental psychology. For that reason, we do not discuss considerations about when we should even consider an interaction (but see, for example, Harrell, 2001 for insightful discussion, as well as Gelman \& Hill, 2007, p. 36).^[The short of those considerations is that introducing additional complexity (degrees of freedom) increases the risk of overfitting to the data, and with it the risk of spurious/unreliable conclusions. It is thus advisable to include additional complexity in the model only if is is motivated theoretically, by previous work, or other *a priori* considerations. Another specific recommendation you'll see often is to only include interactions if all their components are also included in the model, unless there is a good theoretical reason to do otherwise. These recommendations are not specific to the LM.]
+We expand the analysis developed in the factor coding tutorial further by removing the assumption that the effects of `Condition` and `DiffusionConstant` are additive. To this end, we are adding a new predictor to the model that represents the interaction between `Condition` and `DiffusionConstant`.^[The test of whether two effects are additive is not to be confused with the assumption of the LM that all of the *terms* in the model---i.e., all the $x_k \beta_k$--- have additive effects.  The additivity assumption of the model still holds: just as we assumed before that the effects of `Condition` and `DiffusionConstant` are additive, we now assume that the effects of `Condition`, `DiffusionConstant`, and their interaction are additive.]
 
-For the case of one continuous and one categorical predictor, the geometric interpretation of the model is that we now allow the two lines (corresponding to the continuous predictor's effect at the two levels of the categorical predictor) to not be parallel. And our question of whether the interaction is *significant* becomes the question whether the difference in the slope of the two lines is statistically different from zero.
+For the remainder of this tutorial, we focus on the type of planned analysis typical for (or at least the idea of) experimental psychology. For that reason, we do not discuss considerations about when we should even consider an interaction (but see, for example, Harrell, 2001 for insightful discussion, as well as Gelman \& Hill, 2007, p. 36).^[The short of those considerations is that introducing additional complexity (degrees of freedom) increases the risk of overfitting to the data, and with it the risk of spurious/unreliable conclusions. It is thus advisable to include additional complexity in the model only if is is motivated theoretically, by previous work, or other *a priori* considerations---e.g., the design of the experiment. Another specific recommendation you'll see often is to only include interactions if all their components are also included in the model, unless there is a good theoretical reason to do otherwise. These recommendations are not specific to the LM.]
+
+For the case of one continuous and one categorical predictor, the geometric interpretation of the model is that we now allow the two lines (corresponding to the continuous predictor's effect at the two levels of the categorical predictor) to not be parallel. And **the question of whether the interaction is *significant* becomes the question whether the difference in the slope of the two lines is statistically different from zero**.
 
 We can ask this question by adding a new predictor to the model that is the *product* of the two predictors (cf. Gelman \& Hill, 2007, p. 34-36; James et al., 2013, p. 87-90). We then ask whether this new predictor has a non-zero effect, i.e., we ask whether the coefficient for this new predictor is different from zero. In R, the regression formula for this model is written as (where the colon is the interaction operator):
 
@@ -84,7 +95,14 @@ Just like, e.g., factor coding implicit creates an additional numerical variable
 With this change in contrast, the model matrix also changes:
 
 ```{r, echo=T}
-model.matrix( ~ 1 + Condition * DiffusionConstant, data = d)
+knitr::kable(
+  model.matrix(~ 1 + Condition * DiffusionConstant, data = d),
+  format = "latex",
+  booktabs = TRUE
+) %>%
+  kableExtra::kable_styling(
+    latex_options = "HOLD_position",
+    font_size = 8)
 ```
 
 
@@ -131,7 +149,7 @@ Note also that the intercept estimate in the interaction model is not identical 
  
  1. On Figure 3, draw a line segment that correspond to the intercept. I.e., where along the x-axis does the intercept make a prediction (a vertical line segment) and from where to where along y should the line segment go?
  1. On Figure 3, draw a line segment that correspond to the effect of condition.
- 1. Calculate the slope for the crowded condition from the model output shown above.
+ 1. Try to calculate the slope for the crowded condition from the model output shown above. If you're not sure how to do it, discuss with your peers and post your questions/conclusions on Slack.
  1. What's a geometric interpretation of an interaction between two *continuous* predictors (x1 and x2)? For this it might be helpful to first think about the geometric interpretation of two additive continuous predictors (a plane over x1 and x2, the height of which is given along the third axis, y)
  1. True or false? Since the interaction does not have a significant effect, we can safely remove it from the model. 
 
@@ -170,7 +188,14 @@ When we have interactions in our model, we might also want to report the *simple
 In this approach, we do not split the data into the two conditions and fit separate models (`Threshold ~ 1 + DiffusionConstant`) to it. Rather, we use all of the data we have and simple re-parameterize/recode the same LM we have already fit to read out the simple effects of `DiffusionConstant` at each level of condition. In R, this can be done with the convenient embedding operator `/`. Here's the model matrix resulting from this operator does for the present case:
 
 ```{r, echo=T}
-model.matrix( ~ 1 + Condition / DiffusionConstant_c, data = d)
+knitr::kable(
+  model.matrix(~ 1 + Condition / DiffusionConstant_c, data = d),
+  format = "latex",
+  booktabs = TRUE
+) %>%
+  kableExtra::kable_styling(
+    latex_options = "HOLD_position",
+    font_size = 8)
 ```
 
 and here is the resulting LM:
@@ -185,9 +210,13 @@ This re-parameterization does not change the predicted/fitted responses of the m
 ## Writing up the analysis results
 
 \color{lightgray}
-We analyzed the data with a linear regression, using the function `lm` from the `base` package (citation with version) of the software `R` (citation with version). We calculated each subject's mean thresholds for the crowded and uncrowded condition. These 20 threshold values were regressed against condition (deviation-coded: .5 = *crowded* vs. -.5 = *uncrowded*), the diffusion constant **(centered), and their interaction**. We found a statistically significant **main** effect of condition ($\widehat{\beta}=.442, t=4.697, p<.01$), so that subjects reach threshold performance at larger sizes in the crowded condition, compared to the uncrowded condition. We also found a statistically significant effect of the diffusion constant ($\widehat{\beta}=.037, t=5.846, p<.01$), so that larger diffusion constants required larger sizes to achieve threshold performance. **The interaction was not significant ($\widehat{\beta} = 0.009, p > .5$).**^[\color{black}Note that we usually don't report the simple effects unless the interaction was significant.]
+We analyzed the data with a linear regression, using the function `lm` from the `base` package (citation with version) of the software `R` (citation with version). We calculated each subject's mean thresholds for the crowded and uncrowded condition. These 20 threshold values were regressed against condition (effect-coded: .5 = *crowded* vs. -.5 = *uncrowded*), the diffusion constant **(centered), and their interaction**. We found a statistically significant **main** effect of condition ($\widehat{\beta}=.442, t=4.697, p<.01$), so that subjects reach threshold performance at larger sizes in the crowded condition, compared to the uncrowded condition. We also found a statistically significant effect of the diffusion constant ($\widehat{\beta}=.037, t=5.846, p<.01$), so that larger diffusion constants required larger sizes to achieve threshold performance. **The interaction was not significant ($\widehat{\beta} = 0.009, p > .5$).**^[\color{black}Note that we usually don't report the simple effects unless the interaction was significant.]
 \color{black}
 
+# Discussion questions for class
+
+ In your favorite statistics program, try to fit a Bayesian linear regression with the interaction between `Condition` and `DiffusionConstant_c`.
+ 
 <!-- # Session info
 
 ```{r session_info, include=TRUE, echo=TRUE, results='markup'}

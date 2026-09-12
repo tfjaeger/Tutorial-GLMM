@@ -125,7 +125,14 @@ And, each time a regression function is called, this allows R to *implicitly* cr
 Looking at the model matrix can be a powerful tool in understanding factor coding. For example, prior to specifying any factor coding, the model matrix for the above model would be:
 
 ```{r, echo=T}
-model.matrix( ~ 1 + Condition, data = d)
+knitr::kable(
+  model.matrix(~ 1 + Condition, data = d),
+  format = "latex",
+  booktabs = TRUE
+) %>%
+  kableExtra::kable_styling(
+    latex_options = "HOLD_position",
+    font_size = 8)
 ```
 
 Notice the implicitly created column of 1s for the intercept 'predictor' (i.e., $x_0$ is the constant 1). We also see that the first 10 rows of the data are coded as 1 for Condition and the second 10 rows as 0. That's because the first 10 rows are from the uncrowded condition (see above). Below, I'll show the model matrix for each of the coding examples. This should also help you translate the examples into another statistic program: if push comes to shove, you can always manually create the variables shown in the model matrix and then hand that manually created data to the model-fitting function of your program.
@@ -141,7 +148,14 @@ contrasts(d$Condition)
 With this change in contrast, the model matrix also changes. Now the first 10 rows of the data are coded as 0 for the condition predictor, and the second rows are coded as 1.
 
 ```{r, echo=T}
-model.matrix( ~ 1 + Condition, data = d)
+knitr::kable(
+  model.matrix(~ 1 + Condition, data = d),
+  format = "latex",
+  booktabs = TRUE
+) %>%
+  kableExtra::kable_styling(
+    latex_options = "HOLD_position",
+    font_size = 8)
 ```
 
 Now we can fit the LM and summarize that *fit*:
@@ -219,7 +233,14 @@ contrasts(d$Condition)
 With this change in contrast, the model matrix also changes:
 
 ```{r, echo=T}
-model.matrix( ~ 1 + Condition, data = d)
+knitr::kable(
+  model.matrix(~ 1 + Condition, data = d),
+  format = "latex",
+  booktabs = TRUE
+) %>%
+  kableExtra::kable_styling(
+    latex_options = "HOLD_position",
+    font_size = 8)
 ```
 
 Let's refit the model with this newly coded factor:
@@ -229,7 +250,7 @@ l.deviation = lm(Threshold ~ 1 + Condition, data = d)
 summary(l.deviation)
 ```
 
-In this deviation-coded model:
+In this effect-coded model:
 
  + the intercept estimate is now the predicted *overall mean* of the outcome (provided our data is balanced with regard to Condition).
  + the estimate for the coefficient of Condition is half its distance to the mean of all conditions. It also the predicted difference between the conditions. 
@@ -239,19 +260,19 @@ Why do researchers used to ANOVA find this more intuitive? You'll sometimes hear
 
 ### Prepare for class
 
- 1. What happens if we double the values we assign to each of the two deviation-coded conditions, i.e., if we use 1 vs. -1 instead of .5 vs. -.5? What if we set them to -1000 vs. 1000? What changes and what doesn't? Why? (Try it)
+ 1. What happens if we double the values we assign to each of the two effect-coded conditions, i.e., if we use 1 vs. -1 instead of .5 vs. -.5? What if we set them to -1000 vs. 1000? What changes and what doesn't? Why? (Try it)
 
 ```{r, echo = T}
-contrasts(d$Condition) = cbind("Crowded vs. Uncrowded" = c(1,-1))
+contrasts(d$Condition) = cbind("Crowded vs. mean" = c(1,-1))
 ```
 
- 2. Are the predicted/fitted values of any of these deviation-coded models different from each other? (Try it)
- 3. Are the predicted/fitted values of any of these deviation-coded models different from the treatment-coded model presented in the previous section? Why?
+ 2. Are the predicted/fitted values of any of these effect-coded models different from each other? (Try it)
+ 3. Are the predicted/fitted values of any of these effect-coded models different from the treatment-coded model presented in the previous section? Why?
  
 
 ## Writing up results
 
-How would we write up, for example, the deviation-coded model? There are, of course, about as many difference preferences as they are researchers, and so you will find conflicting advice. But generally, it will be helpful if you are clear about all of the following:
+How would we write up, for example, the effect-coded model? There are, of course, about as many difference preferences as they are researchers, and so you will find conflicting advice. But generally, it will be helpful if you are clear about all of the following:
 
  + What model you used
  + What predictors you considered^[Including the predictors that you did decided not include in the final model (cf. debate about *researchers' degrees of freedom* as summarized in Simmons et al., 2011).]
@@ -261,10 +282,10 @@ How would we write up, for example, the deviation-coded model? There are, of cou
 
 Finally, for any non-trivial model, I highly recommend the use of a summary table of the model and visualization of the *empirical* distribution of the data (potentially, while *also* showing the model's predictions). The latter helps readers not familiar with the analysis approach to understand your results.
 
-Here is a rather detailed write-up for the model with the deviation-coded condition variable. In many scenarios (e.g., if the units of the outcome variable are not necessarily informative), you might decide to provide less detail:
+Here is a rather detailed write-up for the model with the effect-coded condition variable. In many scenarios (e.g., if the units of the outcome variable are not necessarily informative), you might decide to provide less detail:
 
 \color{lightgray}
-We analyzed the data with a linear regression, using the function `lm` from the `base` package (citation with version) of the software `R` (citation with version). We calculated each subject's mean thresholds for the crowded and uncrowded condition. These 20 threshold values were regressed against condition (deviation-coded: .5 = *crowded* vs. -.5 = *uncrowded*). We found a statistically significant main effect of condition ($\widehat{\beta}=.576, t=3.657, p<.01$), so that subjects reached threshold performance at a size that was about half an arcminute larger in the crowded condition (mean = `r  reduce(tidy(l.deviation)[["estimate"]], .f = function(x, y) round(x + .5 * y, 3))`), compared to the uncrowded condition (mean = `r  reduce(tidy(l.deviation)[["estimate"]], .f = function(x, y) round(x - .5 * y, 3))`).
+We analyzed the data with a linear regression, using the function `lm` from the `base` package (citation with version) of the software `R` (citation with version). We calculated each subject's mean thresholds for the crowded and uncrowded condition. These 20 threshold values were regressed against condition (effect-coded: .5 = *crowded* vs. -.5 = *uncrowded*). We found a statistically significant main effect of condition ($\widehat{\beta}=.576, t=3.657, p<.01$), so that subjects reached threshold performance at a size that was about half an arcminute larger in the crowded condition (mean = `r  reduce(tidy(l.deviation)[["estimate"]], .f = function(x, y) round(x + .5 * y, 3))`), compared to the uncrowded condition (mean = `r  reduce(tidy(l.deviation)[["estimate"]], .f = function(x, y) round(x - .5 * y, 3))`).
 \color{black}
 
 
@@ -314,7 +335,7 @@ d %>%
 Here's a somewhat less detailed write-up for our two-predictor model, building on the example provided above:
 
 \color{lightgray}
-We analyzed the data with a linear regression, using the function `lm` from the `base` package (citation with version) of the software `R` (citation with version). We calculated each subject's mean thresholds for the crowded and uncrowded condition. These 20 threshold values were regressed against condition (deviation-coded: .5 = *crowded* vs. -.5 = *uncrowded*) **and the diffusion constant**. We found a statistically significant effect of condition ($\widehat{\beta}=.431, t=4.738, p<.01$), so that subjects reach threshold performance at larger sizes in the crowded condition, compared to the uncrowded condition. **We also found a statistically significant effect of the diffusion constant ($\widehat{\beta}=.035, t=6.373, p<.01$), so that larger diffusion constants required larger sizes to achieve threshold performance.**
+We analyzed the data with a linear regression, using the function `lm` from the `base` package (citation with version) of the software `R` (citation with version). We calculated each subject's mean thresholds for the crowded and uncrowded condition. These 20 threshold values were regressed against condition (effect-coded: .5 = *crowded* vs. -.5 = *uncrowded*) **and the diffusion constant**. We found a statistically significant effect of condition ($\widehat{\beta}=.431, t=4.738, p<.01$), so that subjects reach threshold performance at larger sizes in the crowded condition, compared to the uncrowded condition. **We also found a statistically significant effect of the diffusion constant ($\widehat{\beta}=.035, t=6.373, p<.01$), so that larger diffusion constants required larger sizes to achieve threshold performance.**
 \color{black}
 
 ### Prepare for class
@@ -333,7 +354,7 @@ We analyzed the data with a linear regression, using the function `lm` from the 
 # Intermezzo: centering continuous predictors
 Recall that the intercept estimate changed once we added the diffusion constant as a predictor to the LM. As we've already covered, the intercept always gives us the prediction when all other terms in the model add up to 0 (because, if $\beta_1 x_1 + ... + beta_k  x_k = 0$ then the LM predicts that $E(y) = \beta_0$). Partly for this reason, it is often recommended that all predictors in the model are *centered*. Since the mean of a centered predictor $x_i$ is 0 (i.e., $E(x_i) = 0$), the average of the term $\beta_i x_i$ is also 0. So if *all* predictors in a model are centered, then $\forall i: \beta_i x_i = 0 \Rightarrow \Sigma_{i=1}^k \beta_i x_i = 0 \Rightarrow E(y) = \beta_0$.
 
-For data that is balanced with regard to a factor (e.g., Condition), deviation-coding results in a centered predictor. For example, for the deviation-coded model introduced above, we coded the crowded condition as .5 and the uncrowded condition as -.5. If both conditions appear equally often in the data (as they do), then the average of the implicitly created numerical predictor that results from this coding is 0. 
+For data that is balanced with regard to a factor (e.g., Condition), deviation-coding results in a centered predictor. For example, for the effect-coded model introduced above, we coded the crowded condition as .5 and the uncrowded condition as -.5. If both conditions appear equally often in the data (as they do), then the average of the implicitly created numerical predictor that results from this coding is 0. 
 
 But what about the continuous predictor in our model? `DiffusionConstant` does not have a mean of zero:
 
@@ -398,7 +419,14 @@ levels(d.all$Condition)
 contrasts(d.all$Condition) = cbind(
   "C" = c(1, 0, 0),
   "U" = c(0, 0, 1))
-model.matrix( ~ 1 + Condition, data = d.all)
+knitr::kable(
+  model.matrix(~ 1 + Condition, data = d.all),
+  format = "latex",
+  booktabs = TRUE
+) %>%
+  kableExtra::kable_styling(
+    latex_options = "HOLD_position",
+    font_size = 8)
 ```
 
    + **simple slope** coding
@@ -408,28 +436,56 @@ model.matrix( ~ 1 + Condition, data = d.all)
 contrasts(d.all$Condition) = cbind(
   "C.vs.F" = c(.5,-.5, 0),
   "U.vs.F" = c(0,-.5, .5))
-model.matrix( ~ 1 + Condition, data = d.all)
+knitr::kable(
+  model.matrix(~ 1 + Condition, data = d.all),
+  format = "latex",
+  booktabs = TRUE
+) %>%
+  kableExtra::kable_styling(
+    latex_options = "HOLD_position",
+    font_size = 8)
 ```
 
    + **Helmert** coding (or reverse Helmert coding) to compare weak hypotheses about the relative ordering of factor levels (each levels is compared against the mean of all preceding levels). 
 
 ```{r}
 contrasts(d.all$Condition) = contr.helmert(3)
-model.matrix( ~ 1 + Condition, data = d.all)
+knitr::kable(
+  model.matrix(~ 1 + Condition, data = d.all),
+  format = "latex",
+  booktabs = TRUE
+) %>%
+  kableExtra::kable_styling(
+    latex_options = "HOLD_position",
+    font_size = 8)
 ```
 
    + **sliding difference** coding (forward/backward) to compare stronger hypotheses about the relative order of factor levels (each level of the predictor is compared to the preceding level).
  
 ```{r}
 contrasts(d.all$Condition) = contr.sdif(3)
-model.matrix( ~ 1 + Condition, data = d.all)
+knitr::kable(
+  model.matrix(~ 1 + Condition, data = d.all),
+  format = "latex",
+  booktabs = TRUE
+) %>%
+  kableExtra::kable_styling(
+    latex_options = "HOLD_position",
+    font_size = 8)
 ```  
    
    + **polynomial** coding (or orthogonal polynomial coding)
 
 ```{r}
 contrasts(d.all$Condition) = contr.poly(3)
-model.matrix( ~ 1 + Condition, data = d.all)
+knitr::kable(
+  model.matrix(~ 1 + Condition, data = d.all),
+  format = "latex",
+  booktabs = TRUE
+) %>%
+  kableExtra::kable_styling(
+    latex_options = "HOLD_position",
+    font_size = 8)
 ```
 
  + How do we add and interpret interactions with such multi-level factors? (see this [detailed introduction that goes over the interpretation for the different coefficients](https://stats.idre.ucla.edu/other/mult-pkg/faq/general/faq-how-do-i-interpret-the-coefficients-of-an-effect-coded-variable-involved-in-an-interaction-in-a-regression-model/). R provides many packages that help with the interpretation of higher-order interactions. One is [phia](https://cran.r-project.org/web/packages/phia/index.html), another is [effects](https://cran.r-project.org/web/packages/effects/index.html).

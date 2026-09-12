@@ -6,13 +6,16 @@ library(magrittr)  # pipe!
 
 library(tufte)     # Tufte-style handout formatting
 library(ggthemes)  # nice themes for plotting
+library(scales)    # trans_new() etc. for axis transforms
 library(gganimate) # animation of plots
 library(patchwork)
 library(scatterplot3d)
 
 library(broom)     # working with model output
+library(broom.mixed)  # working with mixed model output
 library(brms)      # Bayesian regression models using Stan
 library(rstanarm)  # Bayesian regression models using Stan
+library(tidybayes) # tidy access to posterior draws (spread_draws, etc.)
 library(marginaleffects)
 
 # set R markdown formatting
