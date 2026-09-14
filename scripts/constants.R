@@ -14,7 +14,9 @@ library(scatterplot3d)
 
 library(lme4)      # frequentist GLMMs
 library(broom)     # working with model output
-library(broom.mixed)  # working with mixed model output
+library(broom.mixed)  # working with mixed model outputlibrary(sjPlot)
+library(effects)
+library(sjPlot)
 library(brms)      # Bayesian regression models using Stan
 library(rstanarm)  # Bayesian regression models using Stan
 library(tidybayes) # tidy access to posterior draws (spread_draws, etc.)
@@ -55,7 +57,7 @@ knitr::knit_hooks$set(output = function(x, options) {
 })
 
 color_block = function(color) {
-  function(x, options) sprintf('\\color{%s}\\begin{verbatim}%s\\end{verbatim}\\color{black}',
+  function(x, options) sprintf('\n\\color{%s}\\begin{verbatim}%s\\end{verbatim}\\color{black}\n',
                                color, x)
 }
 knitr::knit_hooks$set(error = color_block('red'))
