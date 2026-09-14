@@ -13,6 +13,8 @@
         "/^python3 - <<'PY'\nfrom pathlib import Path\n\np = Path\\(\"/Users/tiflo/Documents/GitHub/Tutorial-GLMM/scripts/NLMM-MMM-psychometric-models\\.qmd\"\\)\nlines = p\\.read_text\\(\\)\\.splitlines\\(\\)\n\nin_chunk = False\nchunk_opts = \"\"\n\nfor i, l in enumerate\\(lines, 1\\):\n    if l\\.startswith\\(\"```\\{r\"\\):\n        in_chunk = True\n        chunk_opts = l\n    elif l\\.startswith\\(\"```\"\\) and in_chunk:\n        in_chunk = False\n    elif in_chunk:\n        if \"echo=T\" in chunk_opts or \"echo=TRUE\" in chunk_opts:\n            if not l\\.strip\\(\\)\\.startswith\\(\"#\\|\"\\) and len\\(l\\) > 50:\n                print\\(f\"L\\{i:4d\\} \\(\\{len\\(l\\):2d\\}c\\): \\{l\\}\"\\)\nPY$/": {
             "approve": true,
             "matchCommandLine": true
-        }
+        },
+        "pdfinfo": true,
+        "pdftotext": true
     }
 }
